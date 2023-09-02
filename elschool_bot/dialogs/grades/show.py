@@ -63,6 +63,7 @@ def text_getter(data, text, manager: DialogManager):
 dialog = Dialog(
     Window(Format('{start_data}'), Cancel(Const('изменить настройки')), state=ShowStates.SHOW_SMALL),
     Window(
+        Const('показываю оценки'),
         List(
             Case({
                 True: Format('{item[marks]}\n{item[fix]}\n'),

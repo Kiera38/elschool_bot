@@ -4,7 +4,8 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram_dialog import DialogManager, StartMode, setup_dialogs
 
 from elschool_bot.repository import RepoMiddleware, Repo
-from . import settings, grades
+from . import settings, grades, input_data
+from .grades import start_select_grades
 
 router = Router()
 main_menu = ReplyKeyboardMarkup(keyboard=[
@@ -31,7 +32,7 @@ async def show_grades(message: Message, dialog_manager: DialogManager, repo: Rep
         await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
                              'Это можно сделать на вкладке настройки.')
         return
-    await dialog_manager.start(grades.GradesStates.STATUS, mode=StartMode.RESET_STACK)
+    await start_select_grades(dialog_manager)
 
 
 @router.message(Command('showmenu'))
@@ -47,4 +48,5 @@ def register_handlers(dp: Dispatcher, config):
     dp.callback_query.middleware(middleware)
     settings.register_handlers(dp)
     grades.register_handlers(dp)
+    dp.include_router(input_data.dialog)
     setup_dialogs(dp)

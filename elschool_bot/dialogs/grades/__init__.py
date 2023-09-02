@@ -3,15 +3,14 @@ from typing import Dict
 
 from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
-from aiogram_dialog import Dialog, Window, DialogManager
-from aiogram_dialog.widgets.kbd import Button, Checkbox, Row, Calendar, CalendarScope, Back, Multiselect, SwitchTo, \
-    Group
+from aiogram_dialog import Dialog, Window, DialogManager, StartMode
+from aiogram_dialog.widgets.kbd import Button, Checkbox, Row, Calendar, CalendarScope, Multiselect, SwitchTo, Group
 from aiogram_dialog.widgets.kbd.calendar_kbd import CalendarScopeView, CalendarDaysView, CalendarMonthView, \
     CalendarYearsView
 from aiogram_dialog.widgets.text import Const, Format, Text
 
-from elschool_bot.dialogs.grades.data_getter import DataGetterStates
 from elschool_bot.dialogs.grades.show import ShowStates
+from elschool_bot.dialogs.input_data import start_register
 from elschool_bot.repository import RegisterError
 
 
@@ -23,7 +22,8 @@ class GradesStates(StatesGroup):
     STATUS = State()
 
 
-async def on_start(start_data, manager: DialogManager):
+async def start_select_grades(manager: DialogManager):
+    await manager.start(GradesStates.STATUS, mode=StartMode.RESET_STACK)
     repo = manager.middleware_data['repo']
     await manager.update({'status': 'получаю оценки'})
     try:
@@ -34,18 +34,18 @@ async def on_start(start_data, manager: DialogManager):
         login, password = await repo.get_user_data(manager.event.from_user.id)
         text = f'{status}, произошла ошибка:\n{message}. Скорее всего elschool обновил токен.'
         if login is None and password is None:
-            await manager.start(DataGetterStates.INPUT_FIRST,
-                                {'text': f'{text} У меня не сохранены твои данные', 'input_data': ['логин', 'пароль']})
+            await start_register(['логин', 'пароль'],(f'{text} У меня не сохранены твои данные', ''),
+                                 manager, check_get_grades=False)
         elif login is None:
             manager.dialog_data.update(password=password)
-            await manager.start(DataGetterStates.INPUT_FIRST,
-                                {'text': f'{text} У меня не сохранён твой пароль', 'input_data': ['логин']})
+            await start_register(['логин'], (f'{text} У меня не сохранён твой пароль', ''),
+                                 manager, check_get_grades=False, value=password)
         elif password is None:
             manager.dialog_data.update(login=login)
-            await manager.start(DataGetterStates.INPUT_FIRST,
-                                {'text': f'{text} У меня не сохранён твой логин', 'input_data': ['пароль']})
+            await start_register(['пароль'], (f'{text} У меня не сохранён твой логин', ''),
+                                 manager, check_get_grades=False, value=login)
         else:
-            await manager.update({'status': 'попытка регистрации'})
+            await manager.update({'status': f'{text}. Сейчас обновлю у себя'})
             try:
                 jwtoken = await repo.check_register_user(login, password)
             except RegisterError as e:
@@ -55,17 +55,31 @@ async def on_start(start_data, manager: DialogManager):
                     message = f'{e.args[0]}. Твой логин {e.login} и пароль {e.password}?'
                 await manager.update({'text': f'{status}\n{message}'})
             else:
-                await repo.update_data(manager.event.from_user.id, jwtoken, login, password)
-                await manager.update({'status': 'данные введены правильно, теперь попробую получить оценки'})
-                try:
-                    grades = await repo.get_grades(manager.event.from_user.id)
-                except RegisterError as e:
-                    status = manager.dialog_data['status']
-                    message = e.args[0]
-                    await manager.update({'text': f'{status}\n{message}'})
-                else:
-                    await show_select(grades, manager)
+                await update_token(login, password, jwtoken, manager, 'всё')
 
+    else:
+        await show_select(grades, manager)
+
+
+async def update_token(login, password, jwtoken, manager, save_data):
+    repo = manager.middleware_data['repo']
+    await manager.update({'status': 'обновление токена: попытка регистрации'})
+
+    if save_data == 'всё':
+        await repo.update_data(manager.event.from_user.id, jwtoken, login, password)
+    elif save_data == 'логин':
+        await repo.update_data(manager.event.from_user.id, jwtoken, login)
+    elif save_data == 'пароль':
+        await repo.update_data(manager.event.from_user.id, jwtoken, password=password)
+    else:
+        await repo.update_data(manager.event.from_user.id, jwtoken)
+    await manager.update({'status': 'данные введены правильно, теперь попробую получить оценки'})
+    try:
+        grades = await repo.get_grades(manager.event.from_user.id)
+    except RegisterError as e:
+        status = manager.dialog_data['status']
+        message = e.args[0]
+        await manager.update({'text': f'{status}\n{message}'})
     else:
         await show_select(grades, manager)
 
@@ -73,43 +87,19 @@ async def on_start(start_data, manager: DialogManager):
 async def on_process_result(start_data: dict, result, manager: DialogManager):
     if not isinstance(start_data, dict):
         return
-    input_data = start_data.get('input_data')
+    input_data = start_data.get('inputs')
     if input_data is None:
         return
+    login = result['login']
+    password = result['password']
+    jwtoken = result['jwtoken']
     if len(input_data) == 2:
-        login, password = result
+        save_data = None
     elif input_data[0] == 'логин':
-        login = result
-        password = manager.dialog_data['password']
+        save_data = 'пароль'
     else:
-        password = result
-        login = manager.dialog_data['login']
-    await manager.update({'status': 'попытка регистрации'})
-    repo = manager.middleware_data['repo']
-    try:
-        jwtoken = await repo.check_register_user(login, password)
-    except RegisterError as e:
-        status = manager.dialog_data['status']
-        message = e.args[0]
-        if e.login is not None and e.password is not None:
-            message = f'{e.args[0]}. Твой логин {e.login} и пароль {e.password}?'
-        await manager.update({'text': f'{status}\n{message}'})
-    else:
-        if len(input_data) == 2:
-            await repo.update_data(manager.event.from_user.id, jwtoken)
-        elif input_data[0] == 'логин':
-            await repo.update_data(manager.event.from_user.id, jwtoken, password=password)
-        else:
-            await repo.update_data(manager.event.from_user.id, jwtoken, login)
-        await manager.update({'status': 'данные введены правильно, теперь попробую получить оценки'})
-        try:
-            grades = await repo.get_grades(manager.event.from_user.id)
-        except RegisterError as e:
-            status = manager.dialog_data['status']
-            message = e.args[0]
-            await manager.update({'text': f'{status}\n{message}'})
-        else:
-            await show_select(grades, manager)
+        save_data = 'логин'
+    await update_token(login, password, jwtoken, manager, save_data)
 
 
 async def show_select(grades, manager):
@@ -122,6 +112,7 @@ async def show_select(grades, manager):
         lessons=[{'id': i, 'text': item} for i, item in enumerate(grades)]
     )
     await manager.switch_to(GradesStates.SELECT)
+    await manager.show()
 
 
 async def on_select_lesson_date(event, widget, manager: DialogManager, date: datetime.date):
@@ -263,7 +254,7 @@ async def on_show(query, button, manager: DialogManager):
             lessons[lesson] = {'marks': '\n'.join(text), 'fix': fix_text(marks, mean)}
         await manager.start(ShowStates.SHOW_BIG, lessons)
     else:
-        text = [{'marks': 'показываю оценки', 'fix': ''}]
+        text = []
         for lesson, marks in grades.items():
             mean = mean_mark(marks)
             if not mean:
@@ -288,6 +279,10 @@ async def on_del_lesson_date(query, button, manager: DialogManager):
 async def on_del_date(query, button, manager: DialogManager):
     manager.dialog_data.pop('date', None)
     await manager.switch_to(GradesStates.SELECT)
+
+
+async def on_start(data, manager: DialogManager):
+    manager.dialog_data['status'] = 'оценки'
 
 
 class WeekDay(Text):
@@ -390,12 +385,11 @@ dialog = Dialog(
         state=GradesStates.SELECT_DATE
     ),
     Window(Format('{dialog_data[status]}'), state=GradesStates.STATUS),
-    on_start=on_start,
-    on_process_result=on_process_result
+    on_process_result=on_process_result,
+    on_start=on_start
 )
 
 
 def register_handlers(router):
     router.include_router(dialog)
     router.include_router(show.dialog)
-    router.include_router(data_getter.dialog)
