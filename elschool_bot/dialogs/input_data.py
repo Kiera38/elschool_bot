@@ -10,38 +10,43 @@ from elschool_bot.repository import Repo, RegisterError, DataProcessError
 
 
 class InputDataStates(StatesGroup):
+    INPUT_ONE = State()
     INPUT_FIRST = State()
     INPUT_SECOND = State()
     CHECK_DATA = State()
     ERROR = State()
 
 
-async def on_first(message: Message, text_input, manager: DialogManager, first):
+async def check_status(message, manager, index):
     await message.delete()
+
     if 'status' in manager.dialog_data:
-        input_first = manager.start_data['inputs'][0]
+        input_first = manager.start_data['inputs'][index]
         manager.dialog_data['status'] = f'новый {input_first} получил, теперь можешь попробовать ещё раз'
         await manager.switch_to(InputDataStates.ERROR)
+        return True
+    return False
+
+
+async def on_one(message: Message, text_input, manager: DialogManager, one):
+    if await check_status(message, manager, 0):
         return
 
-    if len(manager.start_data['inputs']) == 1:
-        if manager.start_data['inputs'][0] == 'логин':
-            await check_register(first, manager.start_data['value'], manager)
-        else:
-            await check_register(manager.start_data['value'], first, manager)
+    if manager.start_data['inputs'][0] == 'логин':
+        await check_register(one, manager.start_data['value'], manager)
+    else:
+        await check_register(manager.start_data['value'], one, manager)
+
+
+async def on_first(message: Message, text_input, manager: DialogManager, first):
+    if await check_status(message, manager, 0):
         return
 
     await manager.next()
 
 
 async def on_second(message: Message, text_input, manager: DialogManager, second):
-    if message:
-        await message.delete()
-
-    if 'status' in manager.dialog_data:
-        input_first = manager.start_data['inputs'][1]
-        manager.dialog_data['status'] = f'новый {input_first} получил, теперь можешь попробовать ещё раз'
-        await manager.switch_to(InputDataStates.ERROR)
+    if await check_status(message, manager, 1):
         return
 
     if manager.start_data['inputs'][0] == 'логин':
@@ -98,9 +103,14 @@ async def start_register(inputs, input_texts, manager: DialogManager,
                          change_texts=None, value=None, check_get_grades=True):
     if change_texts is None:
         change_texts = input_texts
-    await manager.start(InputDataStates.INPUT_FIRST,
-                        {'inputs': inputs, 'input_texts': input_texts,
-                         'change_texts': change_texts, 'value': value, 'check_get_grades': check_get_grades})
+    if len(inputs) == 1:
+        await manager.start(InputDataStates.INPUT_ONE,
+                            {'inputs': inputs, 'input_texts': input_texts,
+                             'change_texts': change_texts, 'value': value, 'check_get_grades': check_get_grades})
+    else:
+        await manager.start(InputDataStates.INPUT_FIRST,
+                            {'inputs': inputs, 'input_texts': input_texts,
+                             'change_texts': change_texts, 'value': value, 'check_get_grades': check_get_grades})
 
 
 async def on_try(query, button, manager: DialogManager):
@@ -119,6 +129,12 @@ async def on_try(query, button, manager: DialogManager):
 
 
 dialog = Dialog(
+    Window(
+        Format('{texts[0]} Введи {start_data[inputs][0]}.'),
+        TextInput('input_first', on_success=on_one),
+        state=InputDataStates.INPUT_ONE,
+        getter=getter
+    ),
     Window(
         Format('{texts[0]} Сначала введи {start_data[inputs][0]}.'),
         TextInput('input_first', on_success=on_first),

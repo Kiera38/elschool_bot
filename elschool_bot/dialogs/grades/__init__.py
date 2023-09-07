@@ -215,6 +215,18 @@ async def on_show(query, button, manager: DialogManager):
             new_grades[key] = new_values
         grades = new_grades
 
+    marks_selected = {int(i) for i in manager.find('marks_selector').get_checked()}
+    if marks_selected != {5, 4, 3, 2}:
+        new_grades = {}
+        for key, values in grades.items():
+            new_values = []
+            for value in values:
+                mark = value['mark']
+                if mark in marks_selected:
+                    new_values.append(value)
+            new_grades[key] = new_values
+        grades = new_grades
+
     if manager.find('summary').is_checked():
         text = ['кратко показываю оценки:']
         lessons = {5: [], 4: [], 3: [], 2: [], 0: []}
@@ -283,6 +295,9 @@ async def on_del_date(query, button, manager: DialogManager):
 
 async def on_start(data, manager: DialogManager):
     manager.dialog_data['status'] = 'оценки'
+    marks = manager.find('marks_selector')
+    for i in range(2, 6):
+        await marks.set_checked(str(i), True)
 
 
 class WeekDay(Text):
@@ -304,8 +319,8 @@ class RuCalendar(Calendar):
             CalendarScope.DAYS: CalendarDaysView(self._item_callback_data, self.config,
                                                  weekday_text=WeekDay(),
                                                  header_text=Month() + Format('{date: %Y}'),
-                                                 next_month_text='<<' + Month(),
-                                                 prev_month_text=Month() + '>>'),
+                                                 prev_month_text='<<' + Month(),
+                                                 next_month_text=Month() + '>>'),
             CalendarScope.MONTHS: CalendarMonthView(self._item_callback_data, self.config,
                                                     month_text=Month(),
                                                     this_month_text='[' + Month() + ']'),
@@ -340,11 +355,12 @@ dialog = Dialog(
             ),
             when=lambda data, widget, manager: not manager.find('summary').is_checked()
         ),
-        Row(
-            Checkbox(Const('✓ 5'), Const('5'), 'five', default=True),
-            Checkbox(Const('✓ 4'), Const('4'), 'four', default=True),
-            Checkbox(Const('✓ 3'), Const('3'), 'three', default=True),
-            Checkbox(Const('✓ 2'), Const('2'), 'two', default=True)
+        Multiselect(
+            Format('✓ {item}'),
+            Format('{item}'),
+            'marks_selector',
+            lambda item: item,
+            (5, 4, 3, 2)
         ),
         state=GradesStates.SELECT
     ),

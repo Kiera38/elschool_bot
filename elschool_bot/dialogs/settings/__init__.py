@@ -6,7 +6,7 @@ from aiogram_dialog.widgets.kbd import Button, Row, Select
 from aiogram_dialog.widgets.text import Const, Format
 
 from elschool_bot.repository import Repo
-from . import register
+from . import register, remove_data
 from .change_data import ChangeDataStates
 from ..input_data import start_register
 
@@ -57,11 +57,7 @@ async def on_edit_data(query: CallbackQuery, button, manager: DialogManager):
 
 
 async def on_delete_data(query: CallbackQuery, button, manager: DialogManager):
-    repo = manager.middleware_data['repo']
-    await repo.delete_data(query.from_user.id)
-    await manager.update({
-        'status': 'удалил все твои данные'
-    })
+    await remove_data.start(manager)
 
 
 async def on_privacy_policy(query, button, manager: DialogManager):
@@ -74,7 +70,7 @@ async def on_privacy_policy(query, button, manager: DialogManager):
 
 async def on_version(query, button, manager: DialogManager):
     await manager.update({
-        'status': '''моя версия: 3.0.0.dev4
+        'status': '''моя версия: 3.0.0.dev5
 
 Список изменений:
 Это большое обновление. Бот был написан практически с нуля.
@@ -154,3 +150,4 @@ def register_handlers(router):
     router.include_router(dialog)
     router.include_router(register.dialog)
     router.include_router(change_data.dialog)
+    router.include_router(remove_data.dialog)

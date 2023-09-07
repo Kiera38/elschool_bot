@@ -78,7 +78,8 @@ async def on_process_result(start_data, data, manager: DialogManager):
         await repo.update_data(manager.event.from_user.id, jwtoken, login)
     else:
         await repo.update_data(manager.event.from_user.id, jwtoken, password=password)
-    await manager.done()
+    manager.dialog_data.update(status='изменение данных завершено', cancel_text='в настройки')
+    await manager.switch_to(ChangeDataStates.STATUS)
 
 
 async def on_change_all(query, button, manager: DialogManager):

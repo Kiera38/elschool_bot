@@ -92,7 +92,7 @@ class Repo:
         return grades
 
     async def clear_cache(self, user_id):
-        await self.db.execute('UPDATE users SET last_cache=0 WHERE user_id=?', (user_id,))
+        await self.db.execute('UPDATE users SET last_cache=0 WHERE id=?', (user_id,))
         await self.db.commit()
 
     async def check_get_grades(self, jwtoken):
