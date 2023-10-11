@@ -28,8 +28,9 @@ class Repo:
         return await elschool.register(login, password)
 
     async def register_user(self, user_id, jwtoken, url, quarter, login=None, password=None):
-        await self.db.execute('INSERT INTO users (id, jwtoken, url, quarter, login, password) VALUES (?, ?, ?, ?, ?, ?)',
-                              (user_id, jwtoken, url, quarter, login, password))
+        await self.db.execute(
+            'INSERT INTO users (id, jwtoken, url, quarter, login, password) VALUES (?, ?, ?, ?, ?, ?)',
+            (user_id, jwtoken, url, quarter, login, password))
         await self.db.commit()
 
     async def update_data(self, user_id, jwtoken, login=None, password=None):
@@ -113,6 +114,52 @@ class Repo:
     async def update_quarter(self, user_id, quarter):
         await self.db.execute('UPDATE users SET quarter=? WHERE id=?', (quarter, user_id))
         await self.clear_cache(user_id)
+
+    async def save_schedule(self, user_id, name, next_time, interval, show_mode, lessons, dates, marks):
+        async with self.db.cursor() as cursor:
+            await cursor.execute('SELECT id FROM schedules WHERE user_id=?', (user_id,))
+            ids = [id[0] async for id in cursor]
+            ids.sort()
+            prev_id = -1
+            for id in ids:
+                if id - prev_id >= 2:
+                    break
+                prev_id = id
+            else:
+                id = prev_id
+
+            await cursor.execute('INSERT INTO schedules VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                 (user_id, id + 1, name, next_time, interval, show_mode, lessons, dates, marks))
+        await self.db.commit()
+        return id
+
+    async def update_schedule(self, user_id, id, name, next_time, interval, show_mode, lessons, dates, marks):
+        await self.db.execute('UPDATE schedules SET name=?, next_time=?, interval=?, show_mode=?, '
+                              'lessons=?, dates=?, marks=? WHERE user_id=? AND id=?',
+                              (name, next_time, interval, show_mode, lessons, dates, marks, user_id, id))
+        await self.db.commit()
+
+    async def schedule_names(self, user_id):
+        cursor = await self.db.execute('SELECT id, name FROM schedules WHERE user_id=?', (user_id,))
+        return await cursor.fetchall()
+
+    async def remove_schedule(self, user_id, id):
+        await self.db.execute('DELETE FROM schedules WHERE user_id=? AND id=?', (user_id, id))
+        await self.db.commit()
+
+    async def get_schedule(self, user_id, id):
+        cursor = await self.db.execute('SELECT * FROM schedules WHERE user_id=? AND id=?', (user_id, id))
+        return await cursor.fetchone()
+
+    async def get_schedules_for_restore(self):
+        cursor = await self.db.execute('SELECT user_id, id, next_time FROM schedules')
+        schedules = {}
+        async for user_id, id, next_time in cursor:
+            if user_id not in schedules:
+                schedules[user_id] = []
+            schedules[user_id].append({'id': id, 'next_time': next_time})
+        return schedules
+
 
 
 class RepoMiddleware(BaseMiddleware):
@@ -271,7 +318,7 @@ class RandomRepo:
         return grades
 
     async def get_grades_and_url(self, jwtoken, quarter=None):
-        url = f'https:/random.org'
+        url = f'https://random.org'
         return await self.get_grades(jwtoken, url, quarter), url
 
 

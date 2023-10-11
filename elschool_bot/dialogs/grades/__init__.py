@@ -9,7 +9,7 @@ from aiogram_dialog.widgets.kbd.calendar_kbd import CalendarScopeView, CalendarD
     CalendarYearsView
 from aiogram_dialog.widgets.text import Const, Format, Text
 
-from elschool_bot.dialogs.grades.show import ShowStates
+from .show import ShowStates, show_summary, show_detail, show_default
 from elschool_bot.dialogs.input_data import start_register
 from elschool_bot.repository import RegisterError
 
@@ -22,8 +22,7 @@ class GradesStates(StatesGroup):
     STATUS = State()
 
 
-async def start_select_grades(manager: DialogManager):
-    await manager.start(GradesStates.STATUS, mode=StartMode.RESET_STACK)
+async def start_get_grades(manager: DialogManager):
     repo = manager.middleware_data['repo']
     await manager.update({'status': 'получаю оценки'})
     try:
@@ -34,7 +33,7 @@ async def start_select_grades(manager: DialogManager):
         login, password = await repo.get_user_data(manager.event.from_user.id)
         text = f'{status}, произошла ошибка:\n{message}. Скорее всего elschool обновил токен.'
         if login is None and password is None:
-            await start_register(['логин', 'пароль'],(f'{text} У меня не сохранены твои данные', ''),
+            await start_register(['логин', 'пароль'], (f'{text} У меня не сохранены твои данные', ''),
                                  manager, check_get_grades=False)
         elif login is None:
             manager.dialog_data.update(password=password)
@@ -55,36 +54,44 @@ async def start_select_grades(manager: DialogManager):
                     message = f'{e.args[0]}. Твой логин {e.login} и пароль {e.password}?'
                 await manager.update({'text': f'{status}\n{message}'})
             else:
-                await update_token(login, password, jwtoken, manager, 'всё')
+                return await update_token(login, password, jwtoken, manager, 'всё')
 
     else:
+        return grades
+
+
+async def start_select_grades(manager: DialogManager):
+    await manager.start(GradesStates.STATUS, mode=StartMode.RESET_STACK)
+    grades = await start_get_grades(manager)
+    if grades is not None:
         await show_select(grades, manager)
 
 
 async def update_token(login, password, jwtoken, manager, save_data):
     repo = manager.middleware_data['repo']
     await manager.update({'status': 'обновление токена: попытка регистрации'})
+    user_id = manager.event.from_user.id
 
     if save_data == 'всё':
-        await repo.update_data(manager.event.from_user.id, jwtoken, login, password)
+        await repo.update_data(user_id, jwtoken, login, password)
     elif save_data == 'логин':
-        await repo.update_data(manager.event.from_user.id, jwtoken, login)
+        await repo.update_data(user_id, jwtoken, login)
     elif save_data == 'пароль':
-        await repo.update_data(manager.event.from_user.id, jwtoken, password=password)
+        await repo.update_data(user_id, jwtoken, password=password)
     else:
-        await repo.update_data(manager.event.from_user.id, jwtoken)
+        await repo.update_data(user_id, jwtoken)
     await manager.update({'status': 'данные введены правильно, теперь попробую получить оценки'})
     try:
-        grades = await repo.get_grades(manager.event.from_user.id)
+        grades = await repo.get_grades(user_id)
     except RegisterError as e:
         status = manager.dialog_data['status']
         message = e.args[0]
         await manager.update({'text': f'{status}\n{message}'})
     else:
-        await show_select(grades, manager)
+        return grades
 
 
-async def on_process_result(start_data: dict, result, manager: DialogManager):
+async def process_result(start_data, result, manager: DialogManager):
     if not isinstance(start_data, dict):
         return
     input_data = start_data.get('inputs')
@@ -99,7 +106,13 @@ async def on_process_result(start_data: dict, result, manager: DialogManager):
         save_data = 'пароль'
     else:
         save_data = 'логин'
-    await update_token(login, password, jwtoken, manager, save_data)
+    return await update_token(login, password, jwtoken, manager, save_data)
+
+
+async def on_process_result(start_data: dict, result, manager: DialogManager):
+    grades = await process_result(start_data, result, manager)
+    if grades:
+        await show_select(grades, manager)
 
 
 async def show_select(grades, manager):
@@ -125,157 +138,107 @@ async def on_select_date(event, widget, manager: DialogManager, date: datetime.d
     await manager.switch_to(GradesStates.SELECT)
 
 
-def mean_mark(marks):
-    if not marks:
-        return 0
-    values = [mark['mark'] for mark in marks]
-    return sum(values) / len(values)
+def filter_grades(grades, filters, value_filters):
+    filters = [filt for filt in filters if filt is not None]
+    value_filters = [filt for filt in value_filters if filt is not None]
+    if not filters and not value_filters:
+        return grades
+
+    def default_filter(*args):
+        return True
+
+    if not filters:
+        filters = [default_filter]
+    if not value_filters:
+        value_filters = [default_filter]
+
+    # filtered_grades = {}
+    # for key, values in grades.items():
+    #     if all(filt(key, values) for filt in filters):
+    #         new_values = []
+    #         for value in values:
+    #             if all(filt(value) for filt in value_filters):
+    #                 new_values.append(value)
+    #         filtered_grades[key] = new_values
+    #
+    # return filtered_grades
+    return {key: [value for value in values
+                  if all(filt(value) for filt in value_filters)]
+            for key, values in grades.items()
+            if all(filt(key, values) for filt in filters)}
 
 
-def fix_to4(grades):
-    """Как можно исправить оценку до 4."""
-    results = []
-    count_5 = 0
-    while True:
-        new_grades = grades.copy()
-        added_grades = []
-        new_grades += [5] * count_5
-        added_grades += [5] * count_5
-        if sum(new_grades) / len(new_grades) >= 3.5:
-            results.append(added_grades)
-            break
-        while sum(new_grades) / len(new_grades) < 3.5:
-            new_grades.append(4)
-            added_grades.append(4)
-        results.append(added_grades)
-        count_5 += 1
-    return results
+def filter_selected(selected):
+    if not selected:
+        return None
+
+    def filt(name, values):
+        return name in selected
+
+    return filt
 
 
-def fix_to5(grades):
-    """Как можно исправить оценку до 5."""
-    new_grades = grades.copy()
-    added_grades = []
-    while sum(new_grades) / len(new_grades) < 4.5:
-        new_grades.append(5)
-        added_grades.append(5)
-    return [added_grades]
+def filter_lesson_date(lesson_date):
+    if not lesson_date:
+        return None
+
+    def filt(value):
+        val_lesson_date = value['lesson_date']
+        day, month, year = val_lesson_date.split('.')
+        return int(year) == lesson_date.year and int(month) == lesson_date.month and int(day) == lesson_date.day
+
+    return filt
 
 
-def format_fix_marks(added, mark):
-    text = []
-    for add in added:
-        text.append(', '.join(str(i) for i in add))
-    text = '\n'.join(text)
-    return f'для исправления оценки до {mark} можно получить\n{text}'
+def filter_date(date):
+    if not date:
+        return None
+
+    def filt(value):
+        val_date = value['date']
+        day, month, year = val_date.split('.')
+        return int(year) == date.year and int(month) == date.month and int(day) == date.day
+
+    return filt
 
 
-def fix_text(marks, mean):
-    marks = [mark['mark'] for mark in marks]
-    if mean < 3.5:
-        added_marks4 = fix_to4(marks)
-        added_marks5 = fix_to5(marks)
-        return f'{format_fix_marks(added_marks4, 4)}\n{format_fix_marks(added_marks5, 5)}'
-    elif mean < 4.5:
-        added_marks = fix_to5(marks)
-        return format_fix_marks(added_marks, 5)
-    else:
-        return ''
+def filter_marks(marks_selected):
+    if marks_selected == {5, 4, 3, 2}:
+        return None
+
+    def filt(value):
+        mark = value['mark']
+        return mark in marks_selected
+
+    return filt
 
 
 async def on_show(query, button, manager: DialogManager):
     grades = manager.dialog_data['grades']
+    marks_selected = {int(mark) for mark in manager.find('marks_selector').get_checked()}
+
+    if manager.find('summary').is_checked():
+        grades = filter_grades(grades, (), (filter_marks(marks_selected),))
+        await show_summary(grades, manager)
+        return
+
+    selected = set()
     if not manager.find('select_all').is_checked():
         selected = manager.find('select_lessons').get_checked()
         lesson_names = list(grades)
         selected = {lesson_names[int(i)] for i in selected}
-        grades = {key: value for key, value in grades.items() if key in selected}
 
-    if lesson_date := manager.dialog_data.get('lesson_date'):
-        new_grades = {}
-        for key, values in grades.items():
-            new_values = []
-            for value in values:
-                val_lesson_date = value['lesson_date']
-                day, month, year = val_lesson_date.split('.')
-                if int(year) == lesson_date.year and int(month) == lesson_date.month and int(day) == lesson_date.day:
-                    new_values.append(value)
-            new_grades[key] = new_values
-        grades = new_grades
+    date = manager.dialog_data.get('date')
+    lesson_date = manager.dialog_data.get('lesson_date')
 
-    if date := manager.dialog_data.get('date'):
-        new_grades = {}
-        for key, values in grades.items():
-            new_values = []
-            for value in values:
-                val_date = value['date']
-                day, month, year = val_date.split('.')
-                if int(year) == date.year and int(month) == date.month and int(day) == date.day:
-                    new_values.append(value)
-            new_grades[key] = new_values
-        grades = new_grades
+    grades = filter_grades(grades, (filter_selected(selected),),
+                           (filter_lesson_date(lesson_date), filter_date(date), filter_marks(marks_selected)))
 
-    marks_selected = {int(i) for i in manager.find('marks_selector').get_checked()}
-    if marks_selected != {5, 4, 3, 2}:
-        new_grades = {}
-        for key, values in grades.items():
-            new_values = []
-            for value in values:
-                mark = value['mark']
-                if mark in marks_selected:
-                    new_values.append(value)
-            new_grades[key] = new_values
-        grades = new_grades
+    if manager.find('detail').is_checked():
+        await show_detail(grades, manager)
+        return
 
-    if manager.find('summary').is_checked():
-        text = ['кратко показываю оценки:']
-        lessons = {5: [], 4: [], 3: [], 2: [], 0: []}
-        for lesson, marks in grades.items():
-
-            mean = mean_mark(marks)
-            if not mean:
-                lessons[0].append(lesson)
-            elif mean >= 4.5:
-                lessons[5].append(lesson)
-            elif mean >= 3.5:
-                lessons[4].append(lesson)
-            elif mean >= 2.5:
-                lessons[3].append(lesson)
-            else:
-                lessons[2].append(lesson)
-        for mark, lessons in lessons.items():
-            lessons = ', '.join(lessons)
-            if mark == 0:
-                text.append(f'нет оценок по {lessons}')
-            else:
-                text.append(f'{mark} выходит по {lessons}')
-        await manager.start(ShowStates.SHOW_SMALL, '\n'.join(text))
-    elif manager.find('detail').is_checked():
-        lessons = {}
-        for lesson, marks in grades.items():
-            mean = mean_mark(marks)
-            if not mean:
-                lessons[lesson] = {'marks': f'{lesson} нет оценок', 'fix': ''}
-                continue
-            text = [f'{lesson}, средняя {mean: .2f}']
-            for mark in marks:
-                value = mark['mark']
-                lesson_date = mark['lesson_date']
-                date = mark['date']
-                text.append(f'{value}, дата урока {lesson_date}, дата проставления {date}')
-            lessons[lesson] = {'marks': '\n'.join(text), 'fix': fix_text(marks, mean)}
-        await manager.start(ShowStates.SHOW_BIG, lessons)
-    else:
-        text = []
-        for lesson, marks in grades.items():
-            mean = mean_mark(marks)
-            if not mean:
-                text.append({'marks': f'{lesson} нет оценок', 'fix': ''})
-                continue
-            values = ', '.join([str(mark['mark']) for mark in marks])
-            text.append({'marks': f'{lesson} {values}, средняя {mean: .2f}', 'fix': fix_text(marks, mean)})
-
-        await manager.start(ShowStates.SHOW, text)
+    await show_default(grades, manager)
 
 
 async def on_selected_lessons_changed(event, select, manager: DialogManager, item_id):
@@ -291,6 +254,12 @@ async def on_del_lesson_date(query, button, manager: DialogManager):
 async def on_del_date(query, button, manager: DialogManager):
     manager.dialog_data.pop('date', None)
     await manager.switch_to(GradesStates.SELECT)
+
+
+async def on_select_all(event, checkbox, manager: DialogManager):
+    if checkbox.is_checked():
+        select_lessons = manager.find('select_lessons')
+        await select_lessons.reset_checked()
 
 
 async def on_start(data, manager: DialogManager):
@@ -370,7 +339,8 @@ dialog = Dialog(
             Format('✓ все'),
             Format('все'),
             'select_all',
-            default=True
+            default=True,
+            on_state_changed=on_select_all
         ),
         Group(
             Multiselect(

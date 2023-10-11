@@ -1,7 +1,7 @@
 from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import DialogManager, Dialog, Window
-from aiogram_dialog.widgets.kbd import Button, Row, Checkbox, ManagedCheckboxAdapter, Back, Cancel
+from aiogram_dialog.widgets.kbd import Button, Row, Checkbox, Cancel
 from aiogram_dialog.widgets.text import Text, Format, Const, List, Case
 
 
@@ -9,6 +9,117 @@ class ShowStates(StatesGroup):
     SHOW_SMALL = State()
     SHOW = State()
     SHOW_BIG = State()
+
+
+def mean_mark(marks):
+    if not marks:
+        return 0
+    values = [mark['mark'] for mark in marks]
+    return sum(values) / len(values)
+
+
+def fix_to4(grades):
+    """Как можно исправить оценку до 4."""
+    results = []
+    count_5 = 0
+    while True:
+        new_grades = grades.copy()
+        added_grades = []
+        new_grades += [5] * count_5
+        added_grades += [5] * count_5
+        if sum(new_grades) / len(new_grades) >= 3.5:
+            results.append(added_grades)
+            break
+        while sum(new_grades) / len(new_grades) < 3.5:
+            new_grades.append(4)
+            added_grades.append(4)
+        results.append(added_grades)
+        count_5 += 1
+    return results
+
+
+def fix_to5(grades):
+    """Как можно исправить оценку до 5."""
+    new_grades = grades.copy()
+    added_grades = []
+    while sum(new_grades) / len(new_grades) < 4.5:
+        new_grades.append(5)
+        added_grades.append(5)
+    return [added_grades]
+
+
+def format_fix_marks(added, mark):
+    text = []
+    for add in added:
+        text.append(', '.join(str(i) for i in add))
+    text = '\n'.join(text)
+    return f'для исправления оценки до {mark} можно получить\n{text}'
+
+
+def fix_text(marks, mean):
+    marks = [mark['mark'] for mark in marks]
+    if mean < 3.5:
+        added_marks4 = fix_to4(marks)
+        added_marks5 = fix_to5(marks)
+        return f'\n{format_fix_marks(added_marks4, 4)}\n{format_fix_marks(added_marks5, 5)}'
+    elif mean < 4.5:
+        added_marks = fix_to5(marks)
+        return '\n'+format_fix_marks(added_marks, 5)
+    else:
+        return ''
+
+
+async def show_default(grades, manager):
+    text = []
+    for lesson, marks in grades.items():
+        mean = mean_mark(marks)
+        if not mean:
+            text.append({'marks': f'{lesson} нет оценок', 'fix': ''})
+            continue
+        values = ', '.join([str(mark['mark']) for mark in marks])
+        text.append({'marks': f'{lesson} {values}, средняя {mean: .2f}', 'fix': fix_text(marks, mean)})
+    await manager.start(ShowStates.SHOW, text)
+
+
+async def show_detail(grades, manager):
+    lessons = {}
+    for lesson, marks in grades.items():
+        mean = mean_mark(marks)
+        if not mean:
+            lessons[lesson] = {'marks': f'{lesson} нет оценок', 'fix': ''}
+            continue
+        text = [f'{lesson}, средняя {mean: .2f}']
+        for mark in marks:
+            value = mark['mark']
+            lesson_date = mark['lesson_date']
+            date = mark['date']
+            text.append(f'{value}, дата урока {lesson_date}, дата проставления {date}')
+        lessons[lesson] = {'marks': '\n'.join(text), 'fix': fix_text(marks, mean)}
+    await manager.start(ShowStates.SHOW_BIG, lessons)
+
+
+async def show_summary(grades, manager):
+    text = ['кратко показываю оценки:']
+    lessons = {5: [], 4: [], 3: [], 2: [], 0: []}
+    for lesson, marks in grades.items():
+        mean = mean_mark(marks)
+        if not mean:
+            lessons[0].append(lesson)
+        elif mean >= 4.5:
+            lessons[5].append(lesson)
+        elif mean >= 3.5:
+            lessons[4].append(lesson)
+        elif mean >= 2.5:
+            lessons[3].append(lesson)
+        else:
+            lessons[2].append(lesson)
+    for mark, lessons in lessons.items():
+        lessons = ', '.join(lessons)
+        if mark == 0:
+            text.append(f'нет оценок по {lessons}')
+        else:
+            text.append(f'{mark} выходит по {lessons}')
+    await manager.start(ShowStates.SHOW_SMALL, '\n'.join(text))
 
 
 class TextFromGetter(Text):
@@ -46,7 +157,7 @@ async def on_next(query, button, manager: DialogManager):
     manager.dialog_data['current_lesson_index'] = current_lesson_index
 
 
-async def on_show_fix(event, checkbox: ManagedCheckboxAdapter, manager: DialogManager):
+async def on_show_fix(event, checkbox, manager: DialogManager):
     await manager.update({'show_fix': checkbox.is_checked()})
 
 
@@ -56,7 +167,7 @@ def text_getter(data, text, manager: DialogManager):
     if show_fix:
         mark = text['marks']
         fix = text['fix']
-        return f'{mark}\n\n{fix}'
+        return f'{mark}\n{fix}'
     return text['marks']
 
 
@@ -66,7 +177,7 @@ dialog = Dialog(
         Const('показываю оценки'),
         List(
             Case({
-                True: Format('{item[marks]}\n{item[fix]}\n'),
+                True: Format('{item[marks]}{item[fix]}\n'),
                 False: Format('{item[marks]}'),
             }, F['data']['dialog_data'].get('show_fix', False)),
             F['start_data']

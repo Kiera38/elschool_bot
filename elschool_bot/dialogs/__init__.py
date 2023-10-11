@@ -4,12 +4,14 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram_dialog import DialogManager, StartMode, setup_dialogs
 
 from elschool_bot.repository import RepoMiddleware, Repo
-from . import settings, grades, input_data
+from . import settings, grades, input_data, scheduler
 from .grades import start_select_grades
+from .scheduler.scheduler import Scheduler, SchedulerMiddleware
 
 router = Router()
 main_menu = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='оценки'), KeyboardButton(text='настройки')]
+    [KeyboardButton(text='оценки'), KeyboardButton(text='отправка по времени')],
+    [KeyboardButton(text='настройки')]
 ], resize_keyboard=True)
 
 
@@ -41,12 +43,33 @@ async def show_menu(message: Message):
     await message.answer('основное меню', reply_markup=main_menu)
 
 
+@router.message(F.text == 'отправка по времени')
+async def schedules(message: Message, dialog_manager):
+    await scheduler.show(dialog_manager)
+
+
+@router.message(Command('restoreschedules'))
+async def restore_schedules(message: Message, dialog_manager: DialogManager, scheduler):
+    await scheduler.restore_grades_task(dialog_manager)
+    await message.answer('все отправки восстановлены')
+
+
 def register_handlers(dp: Dispatcher, config):
     dp.include_router(router)
+
     middleware = RepoMiddleware(config.dbfile)
     dp.message.middleware(middleware)
     dp.callback_query.middleware(middleware)
+
+    scheduler_ = Scheduler()
+    scheduler_middleware = SchedulerMiddleware(scheduler_)
+    dp.message.middleware(scheduler_middleware)
+    dp.callback_query.middleware(scheduler_middleware)
+
     settings.register_handlers(dp)
     grades.register_handlers(dp)
+    scheduler.register_handlers(dp)
+
     dp.include_router(input_data.dialog)
+
     setup_dialogs(dp)
