@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 import typing
@@ -8,6 +9,8 @@ import aiosqlite
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 
 class Repo:
@@ -24,7 +27,7 @@ class Repo:
         return await cursor.fetchone()
 
     async def check_register_user(self, login, password):
-        elschool = RandomRepo()
+        elschool = ElschoolRepo()
         return await elschool.register(login, password)
 
     async def register_user(self, user_id, jwtoken, url, quarter, login=None, password=None):
@@ -32,11 +35,13 @@ class Repo:
             'INSERT INTO users (id, jwtoken, url, quarter, login, password) VALUES (?, ?, ?, ?, ?, ?)',
             (user_id, jwtoken, url, quarter, login, password))
         await self.db.commit()
+        logger.info(f'пользователь с id {user_id} зарегистрировался')
 
     async def update_data(self, user_id, jwtoken, login=None, password=None):
         await self.db.execute('UPDATE users SET jwtoken=?, login=?, password=?, last_cache=0 WHERE id=?',
                               (jwtoken, login, password, user_id))
         await self.db.commit()
+        logger.info(f'пользователь с id {user_id} обновил свои данные')
 
     async def get_user_data_jwtoken(self, user_id):
         cursor = await self.db.execute('SELECT login, password, jwtoken FROM users WHERE id=?',
@@ -44,14 +49,17 @@ class Repo:
         return await cursor.fetchone()
 
     async def get_grades(self, user_id):
+        logger.debug(f'пользователь с id {user_id} получает оценки')
         async with self.db.cursor() as cursor:
             cursor = typing.cast(aiosqlite.Cursor, cursor)
             await cursor.execute('SELECT last_cache, cache_time, quarter, jwtoken, url FROM users WHERE id=?',
                                  (user_id,))
             last_cache, cache_time, quarter, jwtoken, url = await cursor.fetchone()
             if time.time() - last_cache > cache_time:
+                logger.debug('время кеширования прошло, нужно получить новые оценки')
                 return await self._update_cache(cursor, user_id, quarter, jwtoken, url)
 
+            logger.debug('время кеширования ещё не прошло, отправляются сохранённые оценки')
             await cursor.execute('SELECT lesson_name, lesson_date, date, mark FROM grades WHERE user_id=?',
                                  (user_id,))
             grades = {}
@@ -72,9 +80,9 @@ class Repo:
             return self._update_cache(cursor, user_id, quarter, jwtoken, url)
 
     async def _update_cache(self, cursor: aiosqlite.Cursor, user_id, quarter, jwtoken, url):
-        elschool = RandomRepo()
+        elschool = ElschoolRepo()
         if url:
-            grades = await elschool.get_grades(jwtoken, quarter, url)
+            grades = await elschool.get_grades(jwtoken, url, quarter)
             await cursor.execute('UPDATE users SET last_cache=? WHERE id=?', (time.time(), user_id))
         else:
             grades, url = await elschool.get_grades_and_url(jwtoken, quarter)
@@ -97,7 +105,7 @@ class Repo:
         await self.db.commit()
 
     async def check_get_grades(self, jwtoken):
-        elschool = RandomRepo()
+        elschool = ElschoolRepo()
         return await elschool.get_grades_and_url(jwtoken)
 
     async def delete_data(self, user_id):
@@ -105,10 +113,10 @@ class Repo:
         await self.db.commit()
 
     async def get_quarters(self, user_id):
-        elschool = RandomRepo()
+        elschool = ElschoolRepo()
         cursor = await self.db.execute('SELECT jwtoken, url FROM users WHERE id=?', (user_id,))
         jwtoken, url = await cursor.fetchone()
-        grades = await elschool.get_grades(jwtoken, url)
+        grades = await elschool.get_grades(jwtoken, url, None)
         return list(grades.keys())
 
     async def update_quarter(self, user_id, quarter):
@@ -127,13 +135,16 @@ class Repo:
                 prev_id = id
             else:
                 id = prev_id
-
+            logger.info(f'пользователь с id {user_id} сохранил отправку с id {id} и названием {name}, '
+                        f'которая покажет оценки в {next_time} с повторениями {interval}')
             await cursor.execute('INSERT INTO schedules VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                  (user_id, id + 1, name, next_time, interval, show_mode, lessons, dates, marks))
         await self.db.commit()
         return id
 
     async def update_schedule(self, user_id, id, name, next_time, interval, show_mode, lessons, dates, marks):
+        logger.info(f'пользователь с id {user_id} изменил отправку с названием {name}, '
+                    f'которая покажет оценки в {next_time} с повторениями {interval}')
         await self.db.execute('UPDATE schedules SET name=?, next_time=?, interval=?, show_mode=?, '
                               'lessons=?, dates=?, marks=? WHERE user_id=? AND id=?',
                               (name, next_time, interval, show_mode, lessons, dates, marks, user_id, id))
@@ -144,6 +155,7 @@ class Repo:
         return await cursor.fetchall()
 
     async def remove_schedule(self, user_id, id):
+        logger.info(f'пользовательс id {user_id} удалил отправку с id {id}')
         await self.db.execute('DELETE FROM schedules WHERE user_id=? AND id=?', (user_id, id))
         await self.db.commit()
 
@@ -159,7 +171,6 @@ class Repo:
                 schedules[user_id] = []
             schedules[user_id].append({'id': id, 'next_time': next_time})
         return schedules
-
 
 
 class RepoMiddleware(BaseMiddleware):
@@ -178,13 +189,12 @@ class RepoMiddleware(BaseMiddleware):
 
 
 def _check_response(response, url, error_message, login=None, password=None):
+    logger.debug(f'проверка ответа от сервера: {response}')
     if not response.ok:
         raise RegisterError(f'{error_message}, проблемы с сервером, код ошибки http {response.status}')
 
-    if not url:
-        return
-
     if str(response.url).startswith(url):
+        logger.debug('ответ нормальный')
         return
 
     raise RegisterError(f'{error_message}, так как сервер отправил не на ту страницу '
@@ -195,12 +205,14 @@ def _check_response(response, url, error_message, login=None, password=None):
 
 class ElschoolRepo:
     async def register(self, login, password):
+        logger.debug(f'пользователь с логином {login} получает токен регистрации')
         async with aiohttp.ClientSession() as session:
             response = await session.post('https://elschool.ru/Logon/Index',
                                           params={'login': login, 'password': password}, ssl=False)
             _check_response(response, 'https://elschool.ru/users/privateoffice',
                             'не удалось выполнить регистрацию', login, password)
             jwtoken = session.cookie_jar.filter_cookies('https://elschool.ru').get('JWToken').value
+            logger.debug(f'токен получен {jwtoken}')
             return jwtoken
 
     async def get_grades(self, jwtoken, url, quarter):
@@ -208,6 +220,7 @@ class ElschoolRepo:
             return await self._get_grades(quarter, session, url)
 
     async def _get_grades(self, quarter, session, url):
+        logger.info(f'получаем оценки с {url}')
         response = await session.get(url, ssl=False)
         _check_response(response, url, 'не удалось получить оценки с сервера')
         text = await response.text()
@@ -215,19 +228,40 @@ class ElschoolRepo:
         try:
             bs = BeautifulSoup(text, 'html.parser')
             table = bs.find('table', class_='GradesTable')
-            quarters = [th.text.strip() for th in table.find('thead').find_all('th') if not th.attrs]
+            if not table:
+                raise DataProcessError('на странице не найдена таблица с оценками')
+            thead = table.find('thead')
+            if not thead:
+                raise DataProcessError('на странице не найден блок для заголовков')
+            ths = thead.find_all('th')
+            if not ths:
+                raise DataProcessError('на странице не найдены заголовки с названиями частей года')
+            quarters = [th.text.strip() for th in ths if not th.attrs]
             grades = {}
 
             for i in range(len(quarters)):
                 quarter_grades = {}
-                for tr in table.find('tbody').find_all('tr'):
-                    lesson_name = tr.find('td', class_='grades-lesson').text.strip()
+                tbody = table.find('tbody')
+                if not tbody:
+                    raise DataProcessError('на странице не найдено тело таблицы')
+                trs = tbody.find_all('tr')
+                if not trs:
+                    raise DataProcessError('в таблице нет строк с уроками')
+                for tr in trs:
+                    td = tr.find('td', class_='grades-lesson')
+                    if not td:
+                        raise DataProcessError('в строке таблицы нет названия урока')
+                    lesson_name = td.text.strip()
                     lesson_marks = []
-                    marks = tr.find_all('td', class_='grades-marks')[i]
+                    tds = tr.find_all('td', class_='grades-marks')
+                    if not tds:
+                        raise DataProcessError('в строке таблицы нет частей года')
+                    if i >= len(tds):
+                        raise DataProcessError('выбранной части года нет в строке таблицы')
+                    marks = tds[i]
 
                     for mark in marks.find_all('span', class_='mark-span'):
                         lesson_date, date = mark['data-popover-content'].split('<p>')
-                        lesson_date.split(':')[1].strip()
                         lesson_marks.append({
                             'lesson_date': lesson_date.split(':')[1].strip(),
                             'date': date.split(':')[1].strip(),
@@ -255,7 +289,10 @@ class ElschoolRepo:
                         'при получении ссылки на страницу с оценками произошла ошибка')
         html = await response.text()
         bs = BeautifulSoup(html, 'html.parser')
-        return 'https://elschool.ru/users/diaries/' + bs.find('a', text='Табель')['href']
+        a = bs.find('a', text='Табель')
+        if not a:
+            raise DataProcessError('на странице дневника не найдена ссылка на страницу с оценками')
+        return 'https://elschool.ru/users/diaries/' + a['href']
 
 
 class RandomRepo:

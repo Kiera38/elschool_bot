@@ -69,7 +69,7 @@ def fix_text(marks, mean):
         return ''
 
 
-async def show_default(grades, manager):
+async def show_default(grades, manager, show_back=True):
     text = []
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
@@ -78,10 +78,10 @@ async def show_default(grades, manager):
             continue
         values = ', '.join([str(mark['mark']) for mark in marks])
         text.append({'marks': f'{lesson} {values}, средняя {mean: .2f}', 'fix': fix_text(marks, mean)})
-    await manager.start(ShowStates.SHOW, text)
+    await manager.start(ShowStates.SHOW, {'text': text, 'show_back': show_back})
 
 
-async def show_detail(grades, manager):
+async def show_detail(grades, manager, show_back=True):
     lessons = {}
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
@@ -95,10 +95,10 @@ async def show_detail(grades, manager):
             date = mark['date']
             text.append(f'{value}, дата урока {lesson_date}, дата проставления {date}')
         lessons[lesson] = {'marks': '\n'.join(text), 'fix': fix_text(marks, mean)}
-    await manager.start(ShowStates.SHOW_BIG, lessons)
+    await manager.start(ShowStates.SHOW_BIG, {'lessons': lessons, 'show_back': show_back})
 
 
-async def show_summary(grades, manager):
+async def show_summary(grades, manager, marks_selected, show_back=True):
     text = ['кратко показываю оценки:']
     lessons = {5: [], 4: [], 3: [], 2: [], 0: []}
     for lesson, marks in grades.items():
@@ -114,12 +114,14 @@ async def show_summary(grades, manager):
         else:
             lessons[2].append(lesson)
     for mark, lessons in lessons.items():
+        if mark not in marks_selected:
+            continue
         lessons = ', '.join(lessons)
         if mark == 0:
             text.append(f'нет оценок по {lessons}')
         else:
             text.append(f'{mark} выходит по {lessons}')
-    await manager.start(ShowStates.SHOW_SMALL, '\n'.join(text))
+    await manager.start(ShowStates.SHOW_SMALL, {'grades': '\n'.join(text), 'show_back': show_back})
 
 
 class TextFromGetter(Text):
@@ -162,7 +164,7 @@ async def on_show_fix(event, checkbox, manager: DialogManager):
 
 
 def text_getter(data, text, manager: DialogManager):
-    text = data['start_data'][data['dialog_data']['current_lesson']]
+    text = data['start_data']['lessons'][data['dialog_data']['current_lesson']]
     show_fix = data['dialog_data'].get('show_fix')
     if show_fix:
         mark = text['marks']
@@ -171,8 +173,17 @@ def text_getter(data, text, manager: DialogManager):
     return text['marks']
 
 
+async def on_change_settings(query, button, manager: DialogManager):
+    await manager.done('change_settings')
+
+
 dialog = Dialog(
-    Window(Format('{start_data}'), Cancel(Const('изменить настройки')), state=ShowStates.SHOW_SMALL),
+    Window(
+        Format('{start_data[grades]}'),
+        Button(Const('изменить настройки'), 'change_settings_small',
+               on_change_settings, when=F['start_data']['show_back']),
+        state=ShowStates.SHOW_SMALL
+    ),
     Window(
         Const('показываю оценки'),
         List(
@@ -180,7 +191,7 @@ dialog = Dialog(
                 True: Format('{item[marks]}{item[fix]}\n'),
                 False: Format('{item[marks]}'),
             }, F['data']['dialog_data'].get('show_fix', False)),
-            F['start_data']
+            F['start_data']['text']
         ),
         Checkbox(
             Const('✓ подсказки по исправлению'),
@@ -188,7 +199,8 @@ dialog = Dialog(
             'show_fix',
             on_state_changed=on_show_fix
         ),
-        Cancel(Const('изменить настройки')),
+        Button(Const('изменить настройки'), 'change_settings',
+               on_change_settings, when=F['start_data']['show_back']),
         state=ShowStates.SHOW
     ),
     Window(
@@ -203,7 +215,8 @@ dialog = Dialog(
             'show_fix',
             on_state_changed=on_show_fix
         ),
-        Cancel(Const('изменить настройки')),
+        Button(Const('изменить настройки'), 'change_settings_big',
+               on_change_settings, when=F['start_data']['show_back']),
         state=ShowStates.SHOW_BIG
     ),
     on_start=on_start

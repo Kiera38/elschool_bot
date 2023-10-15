@@ -1,15 +1,15 @@
+import asyncio
 import datetime
 from typing import Callable, Dict, Any, Awaitable
 
-import aioscheduler
 from aiogram import BaseMiddleware
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import TelegramObject
-from aiogram_dialog import DialogManager, Dialog, Window, BaseDialogManager
+from aiogram_dialog import DialogManager, Dialog, Window, BaseDialogManager, StartMode
 from aiogram_dialog.widgets.text import Format
 
-from elschool_bot.dialogs.grades import start_get_grades, process_result, filter_selected, filter_grades, filter_marks, \
-    show_default, show_summary, show_detail
+from elschool_bot.dialogs.grades import (start_get_grades, process_result, filter_selected, filter_grades,
+                                         filter_marks, show_default, show_summary, show_detail)
 from elschool_bot.repository import Repo
 
 
@@ -19,28 +19,38 @@ class SchedulerShowStates(StatesGroup):
 
 class Scheduler:
     def __init__(self):
-        self.aioscheduler = aioscheduler.TimedScheduler()
         self.tasks = {}
 
     def add_grades_task(self, manager: DialogManager, next_time, id):
-        next_time = self.get_next_time(next_time)
-        task = self.aioscheduler.schedule(self.show_grades(manager.bg(), id), next_time)
+        delay = self.get_delay(next_time)
+        self.add_task(delay, id, manager)
+
+    def add_task(self, delay, id, manager):
+        task = asyncio.create_task(self.show_grades(manager.bg(stack_id=''), id, delay))
         self.tasks[(manager.event.from_user.id, id)] = task
+
+    def get_delay(self, next_time):
+        next_time = self.get_next_time(next_time)
+        return self.get_next_time_delay(next_time)
 
     def get_next_time(self, next_time):
         hour, minute = [int(i) for i in next_time.split('_')]
         next_time = datetime.datetime.today().replace(hour=hour - 5, minute=minute)
-        if next_time <= datetime.datetime.utcnow():
-            next_time += datetime.timedelta(days=1)
         return next_time
+
+    def get_next_time_delay(self, next_time):
+        now = datetime.datetime.utcnow()
+        if next_time <= now:
+            next_time += datetime.timedelta(days=1)
+        return (next_time - now).total_seconds()
 
     def remove_grades_task(self, user_id, id):
         if (user_id, id) in self.tasks:
-            del self.tasks[(user_id, id)]
+            task = self.tasks.pop((user_id, id))
+            task.cancel()
 
     def add_grades_interval_task(self, manager: DialogManager, next_time, interval, id):
-        hour, minute = [int(i) for i in next_time.split('_')]
-        next_time = datetime.datetime.today().replace(hour=hour-5, minute=minute)
+        next_time = self.get_next_time(next_time)
         if interval == 0:
             next_time += datetime.timedelta(days=1)
         elif interval == 1:
@@ -49,25 +59,25 @@ class Scheduler:
             next_month = next_time.month + 1
             if next_month == 13:
                 next_month = 1
-                next_time = next_time.replace(year=next_time.year+1)
+                next_time = next_time.replace(year=next_time.year + 1)
             next_time = next_time.replace(month=next_month)
-        task = self.aioscheduler.schedule(self.show_grades(manager.bg(), id), next_time)
-        self.tasks[(manager.event.from_user.id, id)] = task
+        delay = self.get_next_time_delay(next_time)
+        self.add_task(delay, id, manager)
 
-    async def show_grades(self, manager: BaseDialogManager, id):
-        await manager.start(SchedulerShowStates.STATUS, {'scheduler': self, 'id': id})
+    async def show_grades(self, manager: BaseDialogManager, id, delay):
+        await asyncio.sleep(delay)
+        await manager.start(SchedulerShowStates.STATUS, {'scheduler': self, 'id': id}, StartMode.NEW_STACK)
 
     async def restore_grades_task(self, manager: DialogManager):
         repo = manager.middleware_data['repo']
         schedules = await repo.get_schedules_for_restore()
-        for user_id, user_schedules in schedules:
-            bg = manager.bg(user_id, user_id)
+        for user_id, user_schedules in schedules.items():
+            bg = manager.bg(user_id, user_id, stack_id='')
             for schedule in user_schedules:
                 id = schedule['id']
-                next_time = self.get_next_time(schedule['next_time'])
-                task = self.aioscheduler.schedule(self.show_grades(bg, id), next_time)
-                self.tasks[user_id, id] = task
-
+                delay = self.get_delay(schedule['next_time'])
+                task = asyncio.create_task(self.show_grades(bg, id, delay))
+                self.tasks[(user_id, id)] = task
 
 
 class SchedulerMiddleware(BaseMiddleware):
@@ -81,28 +91,54 @@ class SchedulerMiddleware(BaseMiddleware):
         await handler(event, data)
 
 
+def filter_mark_date(date):
+    if date is None:
+        return None
+
+    now = datetime.datetime.now()
+
+    if date == 0:
+        def filt(value):
+            day, month, year = value['date'].split('.')
+            return now.day == int(day)
+        return filt
+
+    if date == 1:
+        def filt(value):
+            day, month, year = value['date'].split('.')
+            return now.weekday() == datetime.datetime(int(year), int(month), int(day)).weekday()
+        return filt
+
+    if date == 2:
+        def filt(value):
+            day, month, year = value['date'].split('.')
+            return now.month == int(month)
+        return filt
+
+
 async def select_grades(grades, manager: DialogManager):
     user_id = manager.event.from_user.id
     id = manager.start_data['id']
+    scheduler = manager.start_data['scheduler']
     repo: Repo = manager.middleware_data['repo']
-    _, _, _, next_time, interval, show_mode, lessons, _, marks = await repo.get_schedule(user_id, id)
-
-    selected = set()
-    if not manager.find('select_all').is_checked():
-        selected = manager.find('select_lessons').get_checked()
-        lesson_names = list(grades)
-        selected = {lesson_names[int(i)] for i in selected}
+    _, _, _, next_time, interval, show_mode, lessons, date, marks = await repo.get_schedule(user_id, id)
 
     marks_selected = {int(mark) for mark in marks.split(',')}
-    grades = filter_grades(grades, (filter_selected(selected),), (filter_marks(marks_selected),))
-    if show_mode == 0:
-        await show_default(grades, manager)
-    elif show_mode == 1:
-        await show_summary(grades, manager)
+    if show_mode == 1:
+        await show_summary(grades, manager, marks_selected, True)
+        return
     else:
-        await show_detail(grades, manager)
+        filters = ()
+        if lessons != 'all':
+            selected = lessons.split(',')
+            filters = (filter_selected(selected),)
 
-    scheduler = manager.start_data['scheduler']
+        grades = filter_grades(grades, filters, (filter_marks(marks_selected), filter_mark_date(date)))
+        if show_mode == 0:
+            await show_default(grades, manager, True)
+        else:
+            await show_detail(grades, manager, True)
+
     if interval != -1:
         scheduler.add_grades_interval_task(manager, next_time, interval, id)
     else:

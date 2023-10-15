@@ -3,6 +3,7 @@ from enum import Enum
 from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, Window, DialogManager
+from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog.widgets.kbd import Button, Column, Select, Row, Checkbox, SwitchTo, Multiselect, Group, Radio
 from aiogram_dialog.widgets.text import Const, Format
 
@@ -18,6 +19,8 @@ class SchedulerStates(StatesGroup):
     SELECT_DATE = State()
     SELECT_WHEN = State()
     STATUS = State()
+    INPUT_CUSTOM_TIME = State()
+    INPUT_NAME = State()
 
 
 class ShowModes(Enum):
@@ -62,7 +65,7 @@ async def select_schedule(query, manager: DialogManager, item, grades):
     repo: Repo = manager.middleware_data['repo']
     scheduler = manager.middleware_data['scheduler']
     scheduler.remove_grades_task(query.from_user.id, item)
-    _, _, _, next_time, interval, show_mode, lessons, _, marks = await repo.get_schedule(query.from_user.id, item)
+    _, _, name, next_time, interval, show_mode, lessons, dates, marks = await repo.get_schedule(query.from_user.id, item)
     manager.dialog_data['schedule_next_time'] = next_time
     show_mode = ShowModes(show_mode)
 
@@ -77,15 +80,24 @@ async def select_schedule(query, manager: DialogManager, item, grades):
             await select_lessons.set_checked(lesson, True)
 
     in_time = manager.find('in_time')
-    await in_time.set_checked(next_time)
+    if in_time in ('12_00', '15_00', '18_00'):
+        await in_time.set_checked(next_time)
+    else:
+        await in_time.set_checked('other')
+        manager.find('input_custom_time').set_widget_data(manager, next_time.replace('_', ':'))
 
     if interval != -1:
         await manager.find('loop').set_checked(True)
-        await manager.find('interval').set_checked(str(interval), True)
+        await manager.find('interval').set_checked(str(interval))
 
     marks_selector = manager.find('marks_selector')
     for mark in marks.split(','):
         await marks_selector.set_checked(mark, True)
+
+    if dates is not None:
+        await manager.find('mark_date_select').set_checked(dates)
+
+    manager.find('input_name').set_widget_data(manager, name)
 
     await start_select(grades, manager)
 
@@ -120,6 +132,8 @@ async def on_cancel_schedule(query, button, manager: DialogManager):
 async def on_save_schedule(query, button, manager: DialogManager):
     user_id = manager.event.from_user.id
     next_time = manager.find('in_time').get_checked()
+    if next_time == 'other':
+        next_time = manager.find('input_custom_time').get_value().replace(':', '_')
 
     if manager.find('loop').is_checked():
         interval = int(manager.find('interval').get_checked())
@@ -139,18 +153,19 @@ async def on_save_schedule(query, button, manager: DialogManager):
         lessons = ','.join(manager.find('select_lessons').get_checked())
 
     marks = ','.join(manager.find('marks_selector').get_checked())
+    dates = int(manager.find('mark_date_select').get_checked())
+    name = manager.find('input_name').get_value()
 
     repo: Repo = manager.middleware_data['repo']
-    name = 'отправка'
     if manager.dialog_data.get('new'):
         id = await repo.save_schedule(user_id, name, next_time, interval,
-                                      show_mode.value, lessons, None, marks)
+                                      show_mode.value, lessons, dates, marks)
         manager.start_data[:] = await repo.schedule_names(user_id)
         del manager.dialog_data['new']
     else:
         id = int(manager.dialog_data['schedule_id'])
         await repo.update_schedule(user_id, id, name + str(id), next_time, interval,
-                                   show_mode.value, lessons, None, marks)
+                                   show_mode.value, lessons, dates, marks)
     scheduler = manager.middleware_data['scheduler']
     scheduler.add_grades_task(manager, next_time, id)
     manager.dialog_data['status'] = 'отправка сохранена'
@@ -181,6 +196,19 @@ async def on_back(query, button, manager: DialogManager):
     await manager.switch_to(SchedulerStates.SCHEDULES_LIST)
 
 
+async def on_input_switch_to_select(message, text_input, manager: DialogManager, input_message):
+    await manager.switch_to(SchedulerStates.SCHEDULE_GRADES_SELECT)
+
+
+async def on_in_time_state_changed(event, select, manager: DialogManager, item):
+    if item == 'other':
+        await manager.switch_to(SchedulerStates.INPUT_CUSTOM_TIME)
+
+
+async def on_cancel_date(query, button, manager: DialogManager):
+    manager.find('mark_date_select').set_widget_data(manager, None)
+
+
 dialog = Dialog(
     Window(
         Const('Выбери, какую отправку хочешь изменить, удалить или добавить новую'),
@@ -196,7 +224,10 @@ dialog = Dialog(
     ),
     Window(
         Const('настройка отправки'),
-        SwitchTo(Const('показывать'), 'when_show', SchedulerStates.SELECT_WHEN),
+        Row(
+            SwitchTo(Const('название'), 'name', SchedulerStates.INPUT_NAME),
+            SwitchTo(Const('показывать'), 'when_show', SchedulerStates.SELECT_WHEN),
+        ),
         Row(
             Checkbox(Const('✓ кратко'), Const('кратко'), 'summary'),
             Checkbox(Const('✓ подробно'), Const('подробно'), 'detail')
@@ -255,8 +286,8 @@ dialog = Dialog(
     Window(
         Const('выбери, за какое время показывать оценки относительно дня отправки'),
         Radio(Format('{item}'), Format('{item}'), 'mark_date_select', lambda item: item[0],
-              [(0, 'день'), (1, 'неделя'), (3, 'месяц')]),
-        Button(Const('сбросить'), 'cancel_date', ),
+              [(0, 'день'), (1, 'неделя'), (2, 'месяц')]),
+        Button(Const('сбросить'), 'cancel_date', on_cancel_date),
         SwitchTo(Const('назад'), '', SchedulerStates.SCHEDULE_GRADES_SELECT),
         state=SchedulerStates.SELECT_DATE
     ),
@@ -268,6 +299,7 @@ dialog = Dialog(
             'in_time',
             lambda item: item.replace(':', '_').replace('другое', 'other'),
             ['12:00', '15:00', '18:00', 'другое'],
+            on_state_changed=on_in_time_state_changed
         ),
         Checkbox(Const('✓ повторять'), Const('повторять'), 'loop'),
         Group(
@@ -288,6 +320,16 @@ dialog = Dialog(
         Format('{dialog_data[status]}'),
         Button(Const('назад'), 'back', on_back),
         state=SchedulerStates.STATUS
+    ),
+    Window(
+        Const('введи время в формате часы:минуты, когда нужно мне отправить'),
+        TextInput('input_custom_time', on_success=on_input_switch_to_select),
+        state=SchedulerStates.INPUT_CUSTOM_TIME
+    ),
+    Window(
+        Const('веди новое название для отправки'),
+        TextInput('input_name', on_success=on_input_switch_to_select),
+        state=SchedulerStates.INPUT_NAME
     ),
     on_process_result=on_process_result
 )

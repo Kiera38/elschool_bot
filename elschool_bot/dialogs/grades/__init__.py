@@ -110,6 +110,12 @@ async def process_result(start_data, result, manager: DialogManager):
 
 
 async def on_process_result(start_data: dict, result, manager: DialogManager):
+    if result == 'change_settings':
+        await manager.switch_to(GradesStates.STATUS)
+        grades = await start_get_grades(manager)
+        if grades is not None:
+            await show_select(grades, manager)
+        return
     grades = await process_result(start_data, result, manager)
     if grades:
         await show_select(grades, manager)
@@ -218,8 +224,7 @@ async def on_show(query, button, manager: DialogManager):
     marks_selected = {int(mark) for mark in manager.find('marks_selector').get_checked()}
 
     if manager.find('summary').is_checked():
-        grades = filter_grades(grades, (), (filter_marks(marks_selected),))
-        await show_summary(grades, manager)
+        await show_summary(grades, manager, marks_selected)
         return
 
     selected = set()
@@ -288,8 +293,8 @@ class RuCalendar(Calendar):
             CalendarScope.DAYS: CalendarDaysView(self._item_callback_data, self.config,
                                                  weekday_text=WeekDay(),
                                                  header_text=Month() + Format('{date: %Y}'),
-                                                 prev_month_text='<<' + Month(),
-                                                 next_month_text=Month() + '>>'),
+                                                 prev_month_text='<< ' + Month(),
+                                                 next_month_text=Month() + ' >>'),
             CalendarScope.MONTHS: CalendarMonthView(self._item_callback_data, self.config,
                                                     month_text=Month(),
                                                     this_month_text='[' + Month() + ']'),
