@@ -4,12 +4,14 @@ from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, Window, DialogManager
 from aiogram_dialog.widgets.input import TextInput
-from aiogram_dialog.widgets.kbd import Button, Column, Select, Row, Checkbox, SwitchTo, Multiselect, Group, Radio
+from aiogram_dialog.widgets.kbd import Button, Column, Select, Row, Checkbox, SwitchTo, Group, Radio
 from aiogram_dialog.widgets.text import Const, Format
 
 from elschool_bot.dialogs.grades import start_get_grades, process_result
 from elschool_bot.dialogs.scheduler import scheduler
 from elschool_bot.repository import Repo
+from elschool_bot.widgets import grades_select
+from elschool_bot.windows import select_lessons, status
 
 
 class SchedulerStates(StatesGroup):
@@ -57,6 +59,7 @@ async def start_select(grades, manager: DialogManager):
     lessons = [{'id': i, 'text': name} for i, name in enumerate(grades)]
     manager.dialog_data['lessons'] = lessons
     manager.dialog_data['checked_date'] = ''
+    del manager.dialog_data['status']
     await manager.switch_to(SchedulerStates.SCHEDULE_GRADES_SELECT)
 
 
@@ -65,7 +68,8 @@ async def select_schedule(query, manager: DialogManager, item, grades):
     repo: Repo = manager.middleware_data['repo']
     scheduler = manager.middleware_data['scheduler']
     scheduler.remove_grades_task(query.from_user.id, item)
-    _, _, name, next_time, interval, show_mode, lessons, dates, marks = await repo.get_schedule(query.from_user.id, item)
+    _, _, name, next_time, interval, show_mode, lessons, dates, marks = await repo.get_schedule(query.from_user.id,
+                                                                                                item)
     manager.dialog_data['schedule_next_time'] = next_time
     show_mode = ShowModes(show_mode)
 
@@ -84,7 +88,7 @@ async def select_schedule(query, manager: DialogManager, item, grades):
         await in_time.set_checked(next_time)
     else:
         await in_time.set_checked('other')
-        manager.find('input_custom_time').set_widget_data(manager, next_time.replace('_', ':'))
+        manager.dialog_data['custom_time'] = next_time.replace('_', ':')
 
     if interval != -1:
         await manager.find('loop').set_checked(True)
@@ -132,8 +136,11 @@ async def on_cancel_schedule(query, button, manager: DialogManager):
 async def on_save_schedule(query, button, manager: DialogManager):
     user_id = manager.event.from_user.id
     next_time = manager.find('in_time').get_checked()
+    if next_time is None:
+        await status.update(manager, 'не выбрано время отправки')
+        return
     if next_time == 'other':
-        next_time = manager.find('input_custom_time').get_value().replace(':', '_')
+        next_time = manager.dialog_data['custom_time'].replace(':', '_')
 
     if manager.find('loop').is_checked():
         interval = int(manager.find('interval').get_checked())
@@ -153,7 +160,9 @@ async def on_save_schedule(query, button, manager: DialogManager):
         lessons = ','.join(manager.find('select_lessons').get_checked())
 
     marks = ','.join(manager.find('marks_selector').get_checked())
-    dates = int(manager.find('mark_date_select').get_checked())
+    dates = manager.find('mark_date_select').get_checked()
+    if dates is not None:
+        dates = int(dates)
     name = manager.find('input_name').get_value()
 
     repo: Repo = manager.middleware_data['repo']
@@ -164,11 +173,11 @@ async def on_save_schedule(query, button, manager: DialogManager):
         del manager.dialog_data['new']
     else:
         id = int(manager.dialog_data['schedule_id'])
-        await repo.update_schedule(user_id, id, name + str(id), next_time, interval,
+        await repo.update_schedule(user_id, id, name, next_time, interval,
                                    show_mode.value, lessons, dates, marks)
     scheduler = manager.middleware_data['scheduler']
     scheduler.add_grades_task(manager, next_time, id)
-    manager.dialog_data['status'] = 'отправка сохранена'
+    status.set(manager, 'отправка сохранена')
     await manager.switch_to(SchedulerStates.STATUS)
 
 
@@ -181,32 +190,50 @@ async def on_delete(query, button, manager: DialogManager):
     await manager.switch_to(SchedulerStates.SCHEDULES_LIST)
 
 
-async def on_select_all(event, checkbox, manager: DialogManager):
-    if checkbox.is_checked():
-        select_lessons = manager.find('select_lessons')
-        await select_lessons.reset_checked()
-
-
-async def on_selected_lessons_changed(event, select, manager: DialogManager, item_id):
-    if select.is_checked(item_id):
-        await manager.find('select_all').set_checked(False)
-
-
 async def on_back(query, button, manager: DialogManager):
     await manager.switch_to(SchedulerStates.SCHEDULES_LIST)
 
 
-async def on_input_switch_to_select(message, text_input, manager: DialogManager, input_message):
+async def on_input_name(message, text_input, manager: DialogManager, input_message):
     await manager.switch_to(SchedulerStates.SCHEDULE_GRADES_SELECT)
+
+
+async def on_input_custom_time(message, text_input, manager: DialogManager, input_message):
+    await manager.switch_to(SchedulerStates.SELECT_WHEN)
+    manager.dialog_data['custom_time'] = input_message
 
 
 async def on_in_time_state_changed(event, select, manager: DialogManager, item):
     if item == 'other':
         await manager.switch_to(SchedulerStates.INPUT_CUSTOM_TIME)
+    elif 'custom_time' in manager.dialog_data:
+        del manager.dialog_data['custom_time']
+
+    if 'status' in manager.dialog_data:
+        del manager.dialog_data['status']
+
+
+async def on_detail_set(event, checkbox, manager: DialogManager):
+    if checkbox.is_checked():
+        await manager.find('summary').set_checked(False)
 
 
 async def on_cancel_date(query, button, manager: DialogManager):
     manager.find('mark_date_select').set_widget_data(manager, None)
+
+
+async def getter(dialog_manager: DialogManager, **kwargs):
+    dialog_data = dialog_manager.dialog_data
+    if custom_time := dialog_data.get('custom_time'):
+        return {'custom_time': f'сейчас выбрано{custom_time}'}
+    return {'custom_time': ''}
+
+
+async def select_getter(dialog_manager: DialogManager, **kwargs):
+    dialog_data = dialog_manager.dialog_data
+    if status := dialog_data.get('status'):
+        return {'status': status}
+    return {'status': 'настройка отправки'}
 
 
 dialog = Dialog(
@@ -223,76 +250,31 @@ dialog = Dialog(
         state=SchedulerStates.SCHEDULES_LIST
     ),
     Window(
-        Const('настройка отправки'),
+        Format('{status}'),
         Row(
             SwitchTo(Const('название'), 'name', SchedulerStates.INPUT_NAME),
             SwitchTo(Const('показывать'), 'when_show', SchedulerStates.SELECT_WHEN),
         ),
-        Row(
-            Checkbox(Const('✓ кратко'), Const('кратко'), 'summary'),
-            Checkbox(Const('✓ подробно'), Const('подробно'), 'detail')
-        ),
-        Row(
-            SwitchTo(
-                Format('выбрать из списка'),
-                'lessons_picked',
-                SchedulerStates.SELECT_LESSONS,
-                when=lambda data, widget, manager: not manager.find('summary').is_checked()
-            ),
-            SwitchTo(
-                Format('{dialog_data[checked_date]} дата проставления'),
-                'date',
-                SchedulerStates.SELECT_DATE,
-                when=lambda data, widget, manager: not manager.find('summary').is_checked()
-            ),
-        ),
-        Multiselect(
-            Format('✓ {item}'),
-            Format('{item}'),
-            'marks_selector',
-            lambda item: item,
-            (5, 4, 3, 2)
-        ),
+        *grades_select.create(SchedulerStates.SELECT_LESSONS, None, SchedulerStates.SELECT_DATE),
         Row(
             SwitchTo(Const('отмена'), 'cancel', SchedulerStates.SCHEDULES_LIST, on_cancel_schedule),
             Button(Const('удалить'), 'delete', when=~F['dialog_data'].get('new'), on_click=on_delete),
             Button(Const('сохранить'), 'save', on_click=on_save_schedule)
         ),
-        state=SchedulerStates.SCHEDULE_GRADES_SELECT
+        state=SchedulerStates.SCHEDULE_GRADES_SELECT,
+        getter=select_getter
     ),
-    Window(
-        Const('выбери уроки'),
-        Checkbox(
-            Format('✓ все'),
-            Format('все'),
-            'select_all',
-            on_state_changed=on_select_all,
-            default=True
-        ),
-        Group(
-            Multiselect(
-                Format('✓ {item[text]}'),
-                Format('{item[text]}'),
-                'select_lessons',
-                lambda item: item['id'],
-                F['dialog_data']['lessons'],
-                on_state_changed=on_selected_lessons_changed
-            ),
-            width=2
-        ),
-        SwitchTo(Const('назад'), '', SchedulerStates.SCHEDULE_GRADES_SELECT),
-        state=SchedulerStates.SELECT_LESSONS
-    ),
+    select_lessons.create(SchedulerStates.SELECT_LESSONS, SchedulerStates.SCHEDULE_GRADES_SELECT),
     Window(
         Const('выбери, за какое время показывать оценки относительно дня отправки'),
-        Radio(Format('{item}'), Format('{item}'), 'mark_date_select', lambda item: item[0],
+        Radio(Format('✓ {item[1]}'), Format('{item[1]}'), 'mark_date_select', lambda item: item[0],
               [(0, 'день'), (1, 'неделя'), (2, 'месяц')]),
         Button(Const('сбросить'), 'cancel_date', on_cancel_date),
         SwitchTo(Const('назад'), '', SchedulerStates.SCHEDULE_GRADES_SELECT),
         state=SchedulerStates.SELECT_DATE
     ),
     Window(
-        Const('выбери, когда показывать'),
+        Format('выбери, когда показывать {custom_time}'),
         Radio(
             Format('✓ {item}'),
             Format('{item}'),
@@ -314,21 +296,18 @@ dialog = Dialog(
             width=2
         ),
         SwitchTo(Const('назад'), 'back_from', SchedulerStates.SCHEDULE_GRADES_SELECT),
-        state=SchedulerStates.SELECT_WHEN
+        state=SchedulerStates.SELECT_WHEN,
+        getter=getter
     ),
-    Window(
-        Format('{dialog_data[status]}'),
-        Button(Const('назад'), 'back', on_back),
-        state=SchedulerStates.STATUS
-    ),
+    status.create(SchedulerStates.STATUS),
     Window(
         Const('введи время в формате часы:минуты, когда нужно мне отправить'),
-        TextInput('input_custom_time', on_success=on_input_switch_to_select),
+        TextInput('input_custom_time', on_success=on_input_custom_time),
         state=SchedulerStates.INPUT_CUSTOM_TIME
     ),
     Window(
         Const('веди новое название для отправки'),
-        TextInput('input_name', on_success=on_input_switch_to_select),
+        TextInput('input_name', on_success=on_input_name),
         state=SchedulerStates.INPUT_NAME
     ),
     on_process_result=on_process_result

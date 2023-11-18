@@ -8,7 +8,8 @@ from aiogram_dialog.widgets.text import Const, Format
 from elschool_bot.repository import Repo
 from . import register, remove_data
 from .change_data import ChangeDataStates
-from ..input_data import start_register
+from elschool_bot.dialogs import input_data
+from elschool_bot.windows import status
 
 
 class States(StatesGroup):
@@ -27,11 +28,11 @@ async def on_result(data, result_data, manager: DialogManager):
         del manager.dialog_data['change_data']
         await change_data.update_no_data(result_data, manager)
         return
-    manager.dialog_data['status'] = result_data.get('status', 'настройки')
+    status.set(manager, result_data.get('status', 'настройки'))
 
 
 async def on_start(start_data, manager: DialogManager):
-    manager.dialog_data['status'] = 'настройки'
+    status.set(manager, 'настройки')
 
 
 async def get_data(repo: Repo, event_from_user: User, **kwargs):
@@ -51,9 +52,9 @@ async def on_edit_data(query: CallbackQuery, button, manager: DialogManager):
         await manager.start(ChangeDataStates.HAS_DATA, {'has_type': 'пароль', 'no_type': 'логин'})
     else:
         manager.dialog_data['change_data'] = True
-        await start_register(('логин', 'пароль'),
-                             ('у меня нет твоих данных, чтобы изменить нужно ввести все.', ''),
-                             manager, ('', ''))
+        await input_data.start(('логин', 'пароль'),
+                               ('у меня нет твоих данных, чтобы изменить нужно ввести все.', ''),
+                               manager, ('', ''))
 
 
 async def on_delete_data(query: CallbackQuery, button, manager: DialogManager):
@@ -61,19 +62,22 @@ async def on_delete_data(query: CallbackQuery, button, manager: DialogManager):
 
 
 async def on_privacy_policy(query, button, manager: DialogManager):
-    await manager.update({'status': "Для получения оценок бот использует логин и пароль от журнала elschool. "
-                                    "Эти данные используются только для получения токена. "
-                                    "Этот токен используется для получения оценок. "
-                                    "Есть возможность сохранить данные от аккаунта elschool. "
-                                    "Разработчик гарантирует, что данные никто смотреть не будет."})
+    await status.update(manager, "Для получения оценок бот использует логин и пароль от журнала elschool. "
+                                 "Эти данные используются только для получения токена. "
+                                 "Этот токен используется для получения оценок. "
+                                 "Есть возможность сохранить данные от аккаунта elschool. "
+                                 "Разработчик гарантирует, что данные никто смотреть не будет.")
 
 
 async def on_version(query, button, manager: DialogManager):
-    await manager.update({
-        'status': '''моя версия: 3.0.0.dev5
+    await status.update(manager, '''моя версия: 3.0.1
 
 Список изменений:
-Это большое обновление. Бот был написан практически с нуля.
+в 3.0.1:
+Различные исправления ошибок и улучшение кода
+
+в 3.0.0:
+Самое большое обновление. Бот был написан практически с нуля.
 
 Совершенно новый интерфейс. Многие кнопки перемещены в новое меню настройки. На главном экране только самые нужные действия.
 Появилась возможность сохранять данные от elschool для автоматического обновления токена регистрации. При этом можно сохранять только часть данных, остальные бот будет спрашивать при обновлении.
@@ -85,37 +89,40 @@ async def on_version(query, button, manager: DialogManager):
 Можно выбрать конкретные уроки, дату урока, дату проставления оценки, саму оценку (например только 4).
 При этом просто посмотреть все оценки в этой части года (четверти или полугодия) можно всего за 2 нажатия. Раньше для этого требовалось 3 нажатия.
 
+Новое меню автоматической отправки:
+Появилось новое меню "отправка по времени". В этом меню можно настроить автоматическую отправку оценок в определённое время.
+Можно настроить как часто будут отправляться оценки.
+
 Исправленные ошибки:
 Исправлено множество ошибок из старых версий. Улучшена обработка ошибок elschool.
-Возможны новые ошибки (эта версия ещё в разработке).'''
-    })
+''')
 
 
 async def on_change_quarter(query, button, manager: DialogManager):
-    manager.dialog_data.update({'status': 'получение данных', 'quarters': []})
+    status.set(manager, 'получение данных', quarters=[])
     await manager.switch_to(States.GET_QUARTER_DATA)
     await manager.show()
     repo = manager.middleware_data['repo']
     quarters = await repo.get_quarters(query.from_user.id)
-    await manager.update({'status': 'выбери 1 из вариантов', 'quarters': quarters})
+    await status.update(manager, 'выбери 1 из вариантов', quarters=quarters)
 
 
 async def on_quarter_select(query, select, manager: DialogManager, quarter):
     repo = manager.middleware_data['repo']
     await repo.update_quarter(query.from_user.id, quarter)
-    manager.dialog_data['status'] = f'часть года изменена на {quarter}'
+    status.set(manager, f'часть года изменена на {quarter}')
     await manager.switch_to(States.MAIN)
 
 
 async def on_register(query, button, manager: DialogManager):
     manager.dialog_data['register'] = True
-    await start_register(('логин', 'пароль'), ('Начнём регистрацию.', ''), manager,
-                         ('', ''), check_get_grades=True)
+    await input_data.start(('логин', 'пароль'), ('Начнём регистрацию.', ''), manager,
+                           ('', ''), check_get_grades=True)
 
 
 dialog = Dialog(
     Window(
-        Format('{dialog_data[status]}'),
+        status.create_status_widget(),
         Button(Const('политика конфиденциальности'), 'privacy_policy', on_privacy_policy),
         Button(Const('регистрация'), 'register', on_register, when=~F['registered']),
         Row(

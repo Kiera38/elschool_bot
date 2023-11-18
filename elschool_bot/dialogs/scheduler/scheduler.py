@@ -11,6 +11,7 @@ from aiogram_dialog.widgets.text import Format
 from elschool_bot.dialogs.grades import (start_get_grades, process_result, filter_selected, filter_grades,
                                          filter_marks, show_default, show_summary, show_detail)
 from elschool_bot.repository import Repo
+from elschool_bot.windows import status
 
 
 class SchedulerShowStates(StatesGroup):
@@ -22,6 +23,8 @@ class Scheduler:
         self.tasks = {}
 
     def add_grades_task(self, manager: DialogManager, next_time, id):
+        if next_time is None:
+            raise ValueError('не выбрано время отправки')
         delay = self.get_delay(next_time)
         self.add_task(delay, id, manager)
 
@@ -125,7 +128,7 @@ async def select_grades(grades, manager: DialogManager):
 
     marks_selected = {int(mark) for mark in marks.split(',')}
     if show_mode == 1:
-        await show_summary(grades, manager, marks_selected, True)
+        await show_summary(grades, manager, marks_selected, False)
         return
     else:
         filters = ()
@@ -135,9 +138,9 @@ async def select_grades(grades, manager: DialogManager):
 
         grades = filter_grades(grades, filters, (filter_marks(marks_selected), filter_mark_date(date)))
         if show_mode == 0:
-            await show_default(grades, manager, True)
+            await show_default(grades, manager, False)
         else:
-            await show_detail(grades, manager, True)
+            await show_detail(grades, manager, False)
 
     if interval != -1:
         scheduler.add_grades_interval_task(manager, next_time, interval, id)
@@ -159,7 +162,7 @@ async def on_process_result(start_data, result, manager: DialogManager):
 
 
 dialog = Dialog(
-    Window(Format('{dialog_data[status]}'), state=SchedulerShowStates.STATUS),
+    status.create(SchedulerShowStates.STATUS),
     on_start=on_start,
     on_process_result=on_process_result
 )

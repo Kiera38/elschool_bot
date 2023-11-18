@@ -4,6 +4,7 @@ from aiogram_dialog.widgets.kbd import Row, Button, Cancel
 from aiogram_dialog.widgets.text import Const, Format
 
 from elschool_bot.repository import Repo
+from elschool_bot.windows import status
 
 
 class RemoveDataStates(StatesGroup):
@@ -24,7 +25,7 @@ async def start(manager: DialogManager):
                             {'data_type': 'пароль', 'jwtoken': jwtoken, 'login': login, 'password': password})
     elif password is None:
         await manager.start(RemoveDataStates.ONE_DATA,
-                            {'data_type': 'логин', 'jwtoken': jwtoken, 'password': password,'login': login})
+                            {'data_type': 'логин', 'jwtoken': jwtoken, 'password': password, 'login': login})
     else:
         await manager.start(RemoveDataStates.ALL_DATA,
                             {'login': login, 'password': password, 'jwtoken': jwtoken})
@@ -66,20 +67,20 @@ async def on_confirm(query, button, manager: DialogManager):
     user_id = manager.event.from_user.id
     if remove_type == 'логин':
         await repo.update_data(user_id, jwtoken, password=password)
-        status = ('удалил твой логин. Но ты всё ещё можешь получать оценки. Когда elschool обновит токен, я просто '
-                  'спрошу у тебя спрошу логин и не буду его сохранять.')
+        text = ('удалил твой логин. Но ты всё ещё можешь получать оценки. Когда elschool обновит токен, я просто '
+                'спрошу у тебя спрошу логин и не буду его сохранять.')
     elif remove_type == 'пароль':
         await repo.update_data(user_id, jwtoken, login)
-        status = ('удалил твой пароль. Но ты всё ещё можешь получать оценки. Когда elschool обновит токен, я просто '
-                  'спрошу у тебя спрошу пароль и не буду его сохранять.')
+        text = ('удалил твой пароль. Но ты всё ещё можешь получать оценки. Когда elschool обновит токен, я просто '
+                'спрошу у тебя спрошу пароль и не буду его сохранять.')
     elif remove_type == 'всё':
         await repo.update_data(user_id, jwtoken)
-        status = ('удалил твой логин и пароль. Но ты всё ещё можешь получать оценки. Когда elschool обновит токен, '
-                  'я просто спрошу у тебя спрошу логин и пароль и не буду его сохранять.')
+        text = ('удалил твой логин и пароль. Но ты всё ещё можешь получать оценки. Когда elschool обновит токен, '
+                'я просто спрошу у тебя спрошу логин и пароль и не буду его сохранять.')
     else:
         await repo.delete_data(user_id)
-        status = 'удалил все твои данные. Ты больше не можешь получать оценки.'
-    manager.dialog_data['status'] = status
+        text = 'удалил все твои данные. Ты больше не можешь получать оценки.'
+    status.set(manager, text)
     await manager.switch_to(RemoveDataStates.STATUS)
 
 
@@ -118,8 +119,5 @@ dialog = Dialog(
         ),
         state=RemoveDataStates.CONFIRM
     ),
-    Window(
-        Format('{dialog_data[status]}'),
-        Cancel(Const('в настройки')),
-        state=RemoveDataStates.STATUS)
+    status.create(RemoveDataStates.STATUS, Cancel(Const('в настройки')))
 )

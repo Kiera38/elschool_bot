@@ -126,19 +126,19 @@ class Repo:
     async def save_schedule(self, user_id, name, next_time, interval, show_mode, lessons, dates, marks):
         async with self.db.cursor() as cursor:
             await cursor.execute('SELECT id FROM schedules WHERE user_id=?', (user_id,))
-            ids = [id[0] async for id in cursor]
-            ids.sort()
-            prev_id = -1
-            for id in ids:
-                if id - prev_id >= 2:
+            ids = {id[0] async for id in cursor}
+            max_id = max(ids) if ids else 0
+            id = 1
+            for id in range(1, max_id+2):
+                if id not in ids:
                     break
-                prev_id = id
-            else:
-                id = prev_id
+            print(repr(name))
+            if not name or name == 'None':
+                name = f'отправка {id}'
             logger.info(f'пользователь с id {user_id} сохранил отправку с id {id} и названием {name}, '
                         f'которая покажет оценки в {next_time} с повторениями {interval}')
             await cursor.execute('INSERT INTO schedules VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                                 (user_id, id + 1, name, next_time, interval, show_mode, lessons, dates, marks))
+                                 (user_id, id, name, next_time, interval, show_mode, lessons, dates, marks))
         await self.db.commit()
         return id
 
@@ -155,7 +155,7 @@ class Repo:
         return await cursor.fetchall()
 
     async def remove_schedule(self, user_id, id):
-        logger.info(f'пользовательс id {user_id} удалил отправку с id {id}')
+        logger.info(f'пользователь с id {user_id} удалил отправку с id {id}')
         await self.db.execute('DELETE FROM schedules WHERE user_id=? AND id=?', (user_id, id))
         await self.db.commit()
 

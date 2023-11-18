@@ -18,22 +18,44 @@ def mean_mark(marks):
     return sum(values) / len(values)
 
 
-def fix_to4(grades):
-    """Как можно исправить оценку до 4."""
+def fix_to3(grades):
     results = []
+    start_count = len(grades)
     count_5 = 0
     while True:
         new_grades = grades.copy()
-        added_grades = []
         new_grades += [5] * count_5
-        added_grades += [5] * count_5
+        if sum(new_grades) / len(new_grades) >= 2.5:
+            results.append(new_grades[start_count:])
+            return results
+        count_4 = 0
+        while True:
+            new_grades2 = new_grades.copy()
+            new_grades2 += [4] * count_4
+            if sum(new_grades2) / len(new_grades2) >= 2.5:
+                results.append(new_grades2[start_count:])
+                break
+            while sum(new_grades2) / len(new_grades2) < 2.5:
+                new_grades2.append(3)
+            results.append(new_grades2[start_count:])
+            count_4 += 1
+        count_5 += 1
+
+
+def fix_to4(grades):
+    """Как можно исправить оценку до 4."""
+    results = []
+    start_count = len(grades)
+    count_5 = 0
+    while True:
+        new_grades = grades.copy()
+        new_grades += [5] * count_5
         if sum(new_grades) / len(new_grades) >= 3.5:
-            results.append(added_grades)
+            results.append(new_grades[start_count:])
             break
         while sum(new_grades) / len(new_grades) < 3.5:
             new_grades.append(4)
-            added_grades.append(4)
-        results.append(added_grades)
+        results.append(new_grades[start_count:])
         count_5 += 1
     return results
 
@@ -41,11 +63,10 @@ def fix_to4(grades):
 def fix_to5(grades):
     """Как можно исправить оценку до 5."""
     new_grades = grades.copy()
-    added_grades = []
+    start_count = len(grades)
     while sum(new_grades) / len(new_grades) < 4.5:
         new_grades.append(5)
-        added_grades.append(5)
-    return [added_grades]
+    return [new_grades[start_count:]]
 
 
 def format_fix_marks(added, mark):
@@ -58,6 +79,12 @@ def format_fix_marks(added, mark):
 
 def fix_text(marks, mean):
     marks = [mark['mark'] for mark in marks]
+    if mean < 2.5:
+        added_marks3 = fix_to3(marks)
+        added_marks4 = fix_to4(marks)
+        added_marks5 = fix_to5(marks)
+        return (f'\n{format_fix_marks(added_marks3, 3)}\n'
+                f'{format_fix_marks(added_marks4, 4)}\n{format_fix_marks(added_marks5, 5)}')
     if mean < 3.5:
         added_marks4 = fix_to4(marks)
         added_marks5 = fix_to5(marks)
@@ -81,7 +108,7 @@ async def show_default(grades, manager, show_back=True):
     await manager.start(ShowStates.SHOW, {'text': text, 'show_back': show_back})
 
 
-async def show_detail(grades, manager, show_back=True):
+async def show_detail(grades, manager: DialogManager, show_back=True):
     lessons = {}
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
@@ -134,15 +161,15 @@ class TextFromGetter(Text):
 
 
 async def on_start(start_data, manager: DialogManager):
-    if isinstance(start_data, dict):
-        manager.dialog_data['current_lesson'] = list(start_data)[0]
+    if isinstance(start_data, dict) and 'lessons' in start_data:
+        manager.dialog_data['current_lesson'] = list(start_data['lessons'])[0]
         manager.dialog_data['current_lesson_index'] = 0
 
 
 async def on_back(query, button, manager: DialogManager):
     current_lesson_index = manager.dialog_data['current_lesson_index']
     current_lesson_index -= 1
-    lessons = manager.start_data
+    lessons = manager.start_data['lessons']
     if current_lesson_index == 0:
         current_lesson_index = len(lessons) - 1
     manager.dialog_data['current_lesson'] = list(lessons)[current_lesson_index]
@@ -152,7 +179,7 @@ async def on_back(query, button, manager: DialogManager):
 async def on_next(query, button, manager: DialogManager):
     current_lesson_index = manager.dialog_data['current_lesson_index']
     current_lesson_index += 1
-    lessons = manager.start_data
+    lessons = manager.start_data['lessons']
     if current_lesson_index == len(lessons):
         current_lesson_index = 0
     manager.dialog_data['current_lesson'] = list(lessons)[current_lesson_index]
@@ -164,7 +191,9 @@ async def on_show_fix(event, checkbox, manager: DialogManager):
 
 
 def text_getter(data, text, manager: DialogManager):
-    text = data['start_data']['lessons'][data['dialog_data']['current_lesson']]
+    print(data)
+    lessons = data['start_data']['lessons']
+    text = lessons[data['dialog_data']['current_lesson']]
     show_fix = data['dialog_data'].get('show_fix')
     if show_fix:
         mark = text['marks']

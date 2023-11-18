@@ -5,7 +5,8 @@ from aiogram_dialog.widgets.kbd import Row, Select, Button, Cancel, Group
 from aiogram_dialog.widgets.text import Const, Format
 
 from elschool_bot.repository import Repo
-from elschool_bot.dialogs.input_data import start_register
+from elschool_bot.dialogs import input_data
+from elschool_bot.windows import status
 
 
 class ChangeDataStates(StatesGroup):
@@ -23,13 +24,13 @@ async def start_one_change(input_type, no_type, manager: DialogManager):
             _, value = await repo.get_user_data(manager.event.from_user.id)
         else:
             value, _ = await repo.get_user_data(manager.event.from_user.id)
-        await start_register((input_type,), ('',), manager, value=value)
+        await input_data.start((input_type,), ('',), manager, value=value)
     else:
         manager.dialog_data['need_save'] = input_type,
-        await start_register((input_type, no_type),
-                             ('', f'хорошо, но у меня не сохранён твой {no_type}. '
-                                  f'Для того, чтобы проверить твой новый {input_type} мне нужен, твой {no_type}'
-                                  f'Я не буду его сохранять'), manager)
+        await input_data.start((input_type, no_type),
+                               ('', f'хорошо, но у меня не сохранён твой {no_type}. '
+                                    f'Для того, чтобы проверить твой новый {input_type} мне нужен, твой {no_type}'
+                                    f'Я не буду его сохранять'), manager)
 
 
 async def on_change_login_all_data(query, button, manager: DialogManager):
@@ -48,12 +49,12 @@ async def on_change_password(query, button, manager: DialogManager):
     await start_one_change('пароль', manager.start_data['no_type'], manager)
 
 
-async def on_select_save_data(query: CallbackQuery, select, dialog_manager: DialogManager, selected_item):
+async def on_select_save_data(query: CallbackQuery, select, manager: DialogManager, selected_item):
     user_id = query.from_user.id
-    repo: Repo = dialog_manager.middleware_data['repo']
-    jwtoken = dialog_manager.start_data['jwtoken']
-    login = dialog_manager.start_data['login']
-    password = dialog_manager.start_data['password']
+    repo: Repo = manager.middleware_data['repo']
+    jwtoken = manager.start_data['jwtoken']
+    login = manager.start_data['login']
+    password = manager.start_data['password']
     if selected_item == 'не сохранить':
         await repo.update_data(user_id, jwtoken)
     elif selected_item == 'только логин':
@@ -62,8 +63,8 @@ async def on_select_save_data(query: CallbackQuery, select, dialog_manager: Dial
         await repo.update_data(user_id, jwtoken, password=password)
     else:
         await repo.update_data(user_id, jwtoken, login, password)
-    dialog_manager.dialog_data.update(status='изменение данных завершено', cancel_text='в настройки')
-    await dialog_manager.next()
+    status.set(manager, 'изменение данных завершено', cancel_text='в настройки')
+    await manager.next()
 
 
 async def on_process_result(start_data, data, manager: DialogManager):
@@ -78,13 +79,13 @@ async def on_process_result(start_data, data, manager: DialogManager):
         await repo.update_data(manager.event.from_user.id, jwtoken, login)
     else:
         await repo.update_data(manager.event.from_user.id, jwtoken, password=password)
-    manager.dialog_data.update(status='изменение данных завершено', cancel_text='в настройки')
+    status.set(manager, 'изменение данных завершено', cancel_text='в настройки')
     await manager.switch_to(ChangeDataStates.STATUS)
 
 
 async def on_change_all(query, button, manager: DialogManager):
     manager.dialog_data['need_save'] = 'логин', 'пароль'
-    await start_register(('логин', 'пароль'), ('', ''), manager)
+    await input_data.start(('логин', 'пароль'), ('', ''), manager)
 
 
 async def update_no_data(data, manager: DialogManager):
@@ -129,10 +130,6 @@ dialog = Dialog(
         ),
         state=ChangeDataStates.CHECK_SAVE_DATA
     ),
-    Window(
-        Format('{dialog_data[status]}'),
-        Cancel(Format('{dialog_data[cancel_text]}')),
-        state=ChangeDataStates.STATUS
-    ),
+    status.create(ChangeDataStates.STATUS, Cancel(Format('{dialog_data[cancel_text]}'))),
     on_process_result=on_process_result
 )
