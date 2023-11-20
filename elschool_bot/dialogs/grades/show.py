@@ -1,7 +1,7 @@
 from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import DialogManager, Dialog, Window
-from aiogram_dialog.widgets.kbd import Button, Row, Checkbox, Cancel
+from aiogram_dialog.widgets.kbd import Button, Row, Checkbox, Cancel, SwitchTo, Select, Group, Radio
 from aiogram_dialog.widgets.text import Text, Format, Const, List, Case
 
 
@@ -9,6 +9,7 @@ class ShowStates(StatesGroup):
     SHOW_SMALL = State()
     SHOW = State()
     SHOW_BIG = State()
+    SELECT_CURRENT_LESSON = State()
 
 
 def mean_mark(marks):
@@ -91,7 +92,7 @@ def fix_text(marks, mean):
         return f'\n{format_fix_marks(added_marks4, 4)}\n{format_fix_marks(added_marks5, 5)}'
     elif mean < 4.5:
         added_marks = fix_to5(marks)
-        return '\n'+format_fix_marks(added_marks, 5)
+        return '\n' + format_fix_marks(added_marks, 5)
     else:
         return ''
 
@@ -186,12 +187,18 @@ async def on_next(query, button, manager: DialogManager):
     manager.dialog_data['current_lesson_index'] = current_lesson_index
 
 
+async def on_select_current_lesson(event, select, manager: DialogManager, item):
+    item = int(item)
+    manager.dialog_data['current_lesson'] = list(manager.start_data['lessons'])[item]
+    manager.dialog_data['current_lesson_index'] = item
+    await manager.switch_to(ShowStates.SHOW_BIG)
+
+
 async def on_show_fix(event, checkbox, manager: DialogManager):
     await manager.update({'show_fix': checkbox.is_checked()})
 
 
 def text_getter(data, text, manager: DialogManager):
-    print(data)
     lessons = data['start_data']['lessons']
     text = lessons[data['dialog_data']['current_lesson']]
     show_fix = data['dialog_data'].get('show_fix')
@@ -236,6 +243,7 @@ dialog = Dialog(
         TextFromGetter(text_getter),
         Row(
             Button(Const('<<'), 'back', on_back),
+            SwitchTo(Format('{dialog_data[current_lesson]}'), 'switch', ShowStates.SELECT_CURRENT_LESSON),
             Button(Const('>>'), 'next', on_next),
         ),
         Checkbox(
@@ -247,6 +255,21 @@ dialog = Dialog(
         Button(Const('изменить настройки'), 'change_settings_big',
                on_change_settings, when=F['start_data']['show_back']),
         state=ShowStates.SHOW_BIG
+    ),
+    Window(
+        Const('выбери урок'),
+        Group(
+            Radio(
+                Format('✓ {item[1]}'),
+                Format('{item[1]}'),
+                'select',
+                lambda item: item[0],
+                lambda data: list((i, lesson) for i, lesson in enumerate(data['start_data']['lessons'])),
+                on_click=on_select_current_lesson
+            ),
+            width=2
+        ),
+        state=ShowStates.SELECT_CURRENT_LESSON
     ),
     on_start=on_start
 )
