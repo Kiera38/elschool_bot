@@ -19,11 +19,16 @@ def create(state, select_state):
     return Window(
         Const('выбери уроки'),
         Checkbox(
-            Format('✓ все'),
-            Format('все'),
+            Const('✓ все'),
+            Const('все'),
             'select_all',
             default=True,
             on_state_changed=on_select_all
+        ),
+        Checkbox(
+            Const('✓ показывать без оценок'),
+            Const('показывать без оценок'),
+            'show_without_marks',
         ),
         Group(
             Multiselect(

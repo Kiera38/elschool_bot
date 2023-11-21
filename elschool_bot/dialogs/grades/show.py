@@ -1,7 +1,7 @@
 from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import DialogManager, Dialog, Window
-from aiogram_dialog.widgets.kbd import Button, Row, Checkbox, Cancel, SwitchTo, Select, Group, Radio
+from aiogram_dialog.widgets.kbd import Button, Row, Checkbox, SwitchTo, Group, Radio
 from aiogram_dialog.widgets.text import Text, Format, Const, List, Case
 
 

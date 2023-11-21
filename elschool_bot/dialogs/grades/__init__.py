@@ -155,20 +155,17 @@ def filter_grades(grades, filters, value_filters):
     if not value_filters:
         value_filters = [default_filter]
 
-    # filtered_grades = {}
-    # for key, values in grades.items():
-    #     if all(filt(key, values) for filt in filters):
-    #         new_values = []
-    #         for value in values:
-    #             if all(filt(value) for filt in value_filters):
-    #                 new_values.append(value)
-    #         filtered_grades[key] = new_values
-    #
-    # return filtered_grades
-    return {key: [value for value in values
-                  if all(filt(value) for filt in value_filters)]
-            for key, values in grades.items()
-            if all(filt(key, values) for filt in filters)}
+    filtered_grades = {}
+    for key, values in grades.items():
+        new_values = []
+        for value in values:
+            if all(filt(value) for filt in value_filters):
+                new_values.append(value)
+
+        if all(filt(key, new_values) for filt in filters):
+            filtered_grades[key] = new_values
+
+    return filtered_grades
 
 
 def filter_selected(selected):
@@ -216,6 +213,16 @@ def filter_marks(marks_selected):
     return filt
 
 
+def filter_without_grades(disabled=False):
+    if disabled:
+        return False
+
+    def filt(name, values):
+        return bool(values)
+
+    return filt
+
+
 async def on_show(query, button, manager: DialogManager):
     grades = manager.dialog_data['grades']
     marks_selected = {int(mark) for mark in manager.find('marks_selector').get_checked()}
@@ -232,8 +239,9 @@ async def on_show(query, button, manager: DialogManager):
 
     date = manager.dialog_data.get('date')
     lesson_date = manager.dialog_data.get('lesson_date')
+    show_without_grades = manager.find('show_without_grades').is_checked()
 
-    grades = filter_grades(grades, (filter_selected(selected),),
+    grades = filter_grades(grades, (filter_selected(selected), filter_without_grades(show_without_grades)),
                            (filter_lesson_date(lesson_date), filter_date(date), filter_marks(marks_selected)))
 
     if manager.find('detail').is_checked():
