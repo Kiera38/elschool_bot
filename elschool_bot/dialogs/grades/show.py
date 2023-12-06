@@ -1,3 +1,5 @@
+import itertools
+
 from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import DialogManager, Dialog, Window
@@ -75,7 +77,7 @@ def format_fix_marks(added, mark):
     for add in added:
         text.append(', '.join(str(i) for i in add))
     text = '\n'.join(text)
-    return f'для исправления оценки до {mark} можно получить\n{text}'
+    return f'для <i>исправления</i> оценки до <b>{mark}</b> можно <u>получить</u>\n{text}'
 
 
 def fix_text(marks, mean):
@@ -102,10 +104,10 @@ async def show_default(grades, manager, show_back=True):
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
         if not mean:
-            text.append({'marks': f'{lesson} нет оценок', 'fix': ''})
+            text.append({'marks': f'<b>{lesson} нет оценок</b>', 'fix': ''})
             continue
         values = ', '.join([str(mark['mark']) for mark in marks])
-        text.append({'marks': f'{lesson} {values}, средняя {mean: .2f}', 'fix': fix_text(marks, mean)})
+        text.append({'marks': f'<b>{lesson}</b> {values}, <b>средняя</b> {mean: .2f}', 'fix': fix_text(marks, mean)})
     await manager.start(ShowStates.SHOW, {'text': text, 'show_back': show_back})
 
 
@@ -114,21 +116,31 @@ async def show_detail(grades, manager: DialogManager, show_back=True):
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
         if not mean:
-            lessons[lesson] = {'marks': f'{lesson} нет оценок', 'fix': ''}
+            lessons[lesson] = {'marks': f'<b>{lesson} нет оценок</b>', 'fix': ''}
             continue
-        text = [f'{lesson}, средняя {mean: .2f}']
+        text = [f'<b>{lesson}</b>, <u>средняя</u> {mean: .2f}']
         for mark in marks:
             value = mark['mark']
             lesson_date = mark['lesson_date']
             date = mark['date']
-            text.append(f'{value}, дата урока {lesson_date}, дата проставления {date}')
+            text.append(f'<b>{value}</b>, <u>дата урока</u> <i>{lesson_date}</i>, <u>дата проставления</u> <i>{date}</i>')
         lessons[lesson] = {'marks': '\n'.join(text), 'fix': fix_text(marks, mean)}
     await manager.start(ShowStates.SHOW_BIG, {'lessons': lessons, 'show_back': show_back})
 
 
 async def show_summary(grades, manager, marks_selected, show_back=True):
-    text = ['кратко показываю оценки:']
+    text = ['<b>статистика</b> <i>оценок</i> за <u>текущую часть года</u>:']
     lessons = {5: [], 4: [], 3: [], 2: [], 0: []}
+    max_mean = ['', 0]
+    min_mean = ['', 6]
+
+    less_mean = []
+    greater_mean = []
+
+    mean_value = mean_mark(list(itertools.chain(*grades.values())))
+    if mean_value != 0:
+        text.append(f'{mean_value:.2f} - <b>средняя</b> <i>оценка</i> по <b>всем</b> предметам')
+
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
         if not mean:
@@ -141,15 +153,42 @@ async def show_summary(grades, manager, marks_selected, show_back=True):
             lessons[3].append(lesson)
         else:
             lessons[2].append(lesson)
+
+        if mean != 0:
+            if mean > max_mean[1]:
+                max_mean = lesson, mean
+            elif mean < min_mean[1]:
+                min_mean = lesson, mean
+
+            if mean >= mean_value:
+                greater_mean.append(lesson)
+            elif mean < mean_value:
+                less_mean.append(lesson)
+
+    if max_mean[1] != 0:
+        text.append(f'{max_mean[1]} — <b>наибольшая</b> <i>средняя</i> оценка по <u>{max_mean[0]}</u>')
+    if min_mean[1] != 6:
+        text.append(f'{min_mean[1]} — <b>наименьшая</b> <i>средняя</i> оценка по <u>{min_mean[0]}</u>')
+
+    if greater_mean:
+        greater_mean_lessons = ', '.join(greater_mean)
+        text.append(f'<b>средняя оценка</b> по предметам {greater_mean_lessons} '
+                    f'<b>больше</b> <u>средней оценки</u> по <i>всем</i> предметам')
+
+    if less_mean:
+        less_mean_lessons = ', '.join(less_mean)
+        text.append(f'<b>средняя оценка</b> по предметам {less_mean_lessons} '
+                    f'<b>меньше</b> <u>средней оценки</u> по <i>всем</i> предметам')
+
     for mark, lessons in lessons.items():
         if mark not in marks_selected:
             continue
         lessons = ', '.join(lessons)
         if mark == 0:
-            text.append(f'нет оценок по {lessons}')
+            text.append(f'<b>нет оценок</b> по предметам {lessons}')
         else:
-            text.append(f'{mark} выходит по {lessons}')
-    await manager.start(ShowStates.SHOW_SMALL, {'grades': '\n'.join(text), 'show_back': show_back})
+            text.append(f'<b>{mark}</b> выходит по {lessons}')
+    await manager.start(ShowStates.SHOW_SMALL, {'grades': '\n\n'.join(text), 'show_back': show_back})
 
 
 class TextFromGetter(Text):

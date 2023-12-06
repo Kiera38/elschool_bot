@@ -15,6 +15,13 @@ async def on_selected_lessons_changed(event, select, manager: DialogManager, ite
         await manager.find('select_all').set_checked(False)
 
 
+async def on_show_without_marks(event, checkbox, manager: DialogManager):
+    show_without_marks = manager.find('show_without_marks_detail')
+    is_checked = checkbox.is_checked()
+    if is_checked != show_without_marks.is_checked():
+        await show_without_marks.set_checked(is_checked)
+
+
 def create(state, select_state):
     return Window(
         Const('выбери уроки'),
@@ -29,6 +36,7 @@ def create(state, select_state):
             Const('✓ показывать без оценок'),
             Const('показывать без оценок'),
             'show_without_marks',
+            on_state_changed=on_show_without_marks
         ),
         Group(
             Multiselect(

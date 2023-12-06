@@ -59,7 +59,8 @@ async def start_select(grades, manager: DialogManager):
     lessons = [{'id': i, 'text': name} for i, name in enumerate(grades)]
     manager.dialog_data['lessons'] = lessons
     manager.dialog_data['checked_date'] = ''
-    del manager.dialog_data['status']
+    if 'status' in manager.dialog_data:
+        del manager.dialog_data['status']
     await manager.switch_to(SchedulerStates.SCHEDULE_GRADES_SELECT)
 
 
