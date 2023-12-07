@@ -113,18 +113,48 @@ async def show_default(grades, manager, show_back=True):
 
 async def show_detail(grades, manager: DialogManager, show_back=True):
     lessons = {}
+    mean_value = mean_mark(list(itertools.chain(*grades.values())))
+
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
         if not mean:
-            lessons[lesson] = {'marks': f'<b>{lesson} нет оценок</b>', 'fix': ''}
+            lessons[lesson] = f'<b>{lesson} нет оценок</b>'
             continue
-        text = [f'<b>{lesson}</b>, <u>средняя</u> {mean: .2f}']
+
+        text = [f'<i>статистика</i> оценок по <b>{lesson}</b>, <u>средняя</u> {mean: .2f}']
+        if mean_value != 0:
+            if mean >= mean_value:
+                text.append(f'<b>эта</b> <i>средняя оценка</i> <b>больше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
+            else:
+                text.append(f'<b>эта</b> <i>средняя оценка</i> <b>меньше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
+
+        if mean >= 4.5:
+            text.append('за <b>эту часть года</b> <u>должна</u> выйти 5')
+        elif mean >= 3.5:
+            text.append('за <b>эту часть года</b> <u>должна</u> выйти 4')
+        elif mean >= 2.5:
+            text.append('за <b>эту часть года</b> <u>должна</u> выйти 3')
+        elif mean > 0:
+            text.append('за <b>эту часть года</b> <u>должна</u> выйти 2')
+        else:
+            text.append('за <b>эту часть года</b> <u>нет оценок</u>. Нужно получить')
+
+        marks_count = {5: 0, 4: 0, 3: 0, 2: 0}
+        marks_text = ['<u>список оценок</u> за <b>текущую</b> часть года:']
         for mark in marks:
             value = mark['mark']
             lesson_date = mark['lesson_date']
             date = mark['date']
-            text.append(f'<b>{value}</b>, <u>дата урока</u> <i>{lesson_date}</i>, <u>дата проставления</u> <i>{date}</i>')
-        lessons[lesson] = {'marks': '\n'.join(text), 'fix': fix_text(marks, mean)}
+            marks_count[value] += 1
+            marks_text.append(
+                f'<b>{value}</b>, <u>дата урока</u> <i>{lesson_date}</i>, <u>дата проставления</u> <i>{date}</i>')
+
+        marks_count_text = [f'<b>всего оценок</b>: {sum(marks_count.values())}, из них:']
+        for mark, count in marks_count.items():
+            marks_count_text.append(f'<b>{mark}</b> - <u>{count}</u>')
+
+        text += '\n'.join(marks_count_text), '\n'.join(marks_text)
+        lessons[lesson] = '\n'.join(('\n\n'.join(text), fix_text(marks, mean)))
     await manager.start(ShowStates.SHOW_BIG, {'lessons': lessons, 'show_back': show_back})
 
 
@@ -239,13 +269,7 @@ async def on_show_fix(event, checkbox, manager: DialogManager):
 
 def text_getter(data, text, manager: DialogManager):
     lessons = data['start_data']['lessons']
-    text = lessons[data['dialog_data']['current_lesson']]
-    show_fix = data['dialog_data'].get('show_fix')
-    if show_fix:
-        mark = text['marks']
-        fix = text['fix']
-        return f'{mark}\n{fix}'
-    return text['marks']
+    return lessons[data['dialog_data']['current_lesson']]
 
 
 async def on_change_settings(query, button, manager: DialogManager):
@@ -284,12 +308,6 @@ dialog = Dialog(
             Button(Const('<<'), 'back', on_back),
             SwitchTo(Format('{dialog_data[current_lesson]}'), 'switch', ShowStates.SELECT_CURRENT_LESSON),
             Button(Const('>>'), 'next', on_next),
-        ),
-        Checkbox(
-            Const('✓ подсказки по исправлению'),
-            Const('подсказки по исправлению'),
-            'show_fix',
-            on_state_changed=on_show_fix
         ),
         Button(Const('изменить настройки'), 'change_settings_big',
                on_change_settings, when=F['start_data']['show_back']),

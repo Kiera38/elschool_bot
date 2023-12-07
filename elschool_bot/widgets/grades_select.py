@@ -51,13 +51,13 @@ def is_detail_checked(manager):
 
 def create(lessons_state, lesson_date_state, date_state):
     select_lessons = SwitchTo(
-        Format('выбрать из списка'),
+        Format('выбрать предметы из списка'),
         'lessons_picked',
         lessons_state,
         when=not_statistics_checked
     )
     select_date = SwitchTo(
-        Format('{dialog_data[checked_date]} дата проставления'),
+        Format('дата проставления'),
         'date',
         date_state
     )
@@ -67,7 +67,7 @@ def create(lessons_state, lesson_date_state, date_state):
             select_lessons,
             Row(
                 SwitchTo(
-                    Format('{dialog_data[checked_date_lesson]} дата урока'),
+                    Format('дата урока'),
                     'date_lesson',
                     lesson_date_state
                 ),
