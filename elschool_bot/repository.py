@@ -79,6 +79,10 @@ class Repo:
             quarter, jwtoken, url = await cursor.fetchone()
             return self._update_cache(cursor, user_id, quarter, jwtoken, url)
 
+    async def set_cache_time(self, user_id, cache_time):
+        await self.db.execute('UPDATE users SET cache_time=? WHERE id=?', (cache_time, user_id))
+        await self.db.commit()
+
     async def _update_cache(self, cursor: aiosqlite.Cursor, user_id, quarter, jwtoken, url):
         elschool = ElschoolRepo()
         if url:
