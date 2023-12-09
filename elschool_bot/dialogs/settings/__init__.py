@@ -144,7 +144,8 @@ async def on_input_cache_time(message, widget, manager: DialogManager, text: str
                 minutes = int(text[1]) + hours * 60
                 seconds = int(text[2]) + minutes * 60
             else:
-                status.set(manager, 'сохранять оценки несколько дней это слишком много. Я должен показывать все изменения.')
+                status.set(manager, 'сохранять оценки на несколько дней это слишком много. '
+                                    'Я должен показывать все изменения.')
                 await manager.switch_to(States.MAIN)
                 return
         elif len(text) % 2 == 0:
