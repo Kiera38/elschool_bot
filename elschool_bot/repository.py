@@ -123,7 +123,8 @@ class Repo:
         await self.db.execute('UPDATE users SET quarter=? WHERE id=?', (quarter, user_id))
         await self.clear_cache(user_id)
 
-    async def save_schedule(self, user_id, name, next_time, interval, show_mode, lessons, dates, marks):
+    async def save_schedule(self, user_id, name, next_time, interval,
+                            show_mode, lessons, dates, marks, show_without_marks):
         async with self.db.cursor() as cursor:
             await cursor.execute('SELECT id FROM schedules WHERE user_id=?', (user_id,))
             ids = {id[0] async for id in cursor}
@@ -132,22 +133,24 @@ class Repo:
             for id in range(1, max_id+2):
                 if id not in ids:
                     break
-            print(repr(name))
             if not name or name == 'None':
                 name = f'отправка {id}'
             logger.info(f'пользователь с id {user_id} сохранил отправку с id {id} и названием {name}, '
                         f'которая покажет оценки в {next_time} с повторениями {interval}')
-            await cursor.execute('INSERT INTO schedules VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                                 (user_id, id, name, next_time, interval, show_mode, lessons, dates, marks))
+            await cursor.execute('INSERT INTO schedules VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                 (user_id, id, name, next_time, interval,
+                                  show_mode, lessons, dates, marks, show_without_marks))
         await self.db.commit()
         return id
 
-    async def update_schedule(self, user_id, id, name, next_time, interval, show_mode, lessons, dates, marks):
+    async def update_schedule(self, user_id, id, name, next_time, interval, show_mode,
+                              lessons, dates, marks, show_without_marks):
         logger.info(f'пользователь с id {user_id} изменил отправку с названием {name}, '
                     f'которая покажет оценки в {next_time} с повторениями {interval}')
         await self.db.execute('UPDATE schedules SET name=?, next_time=?, interval=?, show_mode=?, '
-                              'lessons=?, dates=?, marks=? WHERE user_id=? AND id=?',
-                              (name, next_time, interval, show_mode, lessons, dates, marks, user_id, id))
+                              'lessons=?, dates=?, marks=?, show_without_marks=? WHERE user_id=? AND id=?',
+                              (name, next_time, interval, show_mode,
+                               lessons, dates, marks, show_without_marks, user_id, id))
         await self.db.commit()
 
     async def schedule_names(self, user_id):

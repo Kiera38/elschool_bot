@@ -28,6 +28,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS schedules  (
     lessons TEXT,
     dates INTEGER,
     marks TEXT,
+    show_without_grades INTEGER,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, id))''')
 db.commit()

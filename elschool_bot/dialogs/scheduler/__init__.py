@@ -46,9 +46,7 @@ async def show(manager: DialogManager):
 
 async def on_new(query, button, manager: DialogManager):
     manager.dialog_data.update(new=True, checked_date='')
-    marks_selector = manager.find('marks_selector')
-    for i in range(2, 6):
-        await marks_selector.set_checked(str(i), True)
+    await grades_select.on_start(manager)
     await manager.switch_to(SchedulerStates.STATUS)
     grades = await start_get_grades(manager)
     if grades is not None:
@@ -69,15 +67,15 @@ async def select_schedule(query, manager: DialogManager, item, grades):
     repo: Repo = manager.middleware_data['repo']
     scheduler = manager.middleware_data['scheduler']
     scheduler.remove_grades_task(query.from_user.id, item)
-    _, _, name, next_time, interval, show_mode, lessons, dates, marks = await repo.get_schedule(query.from_user.id,
-                                                                                                item)
+    _, _, name, next_time, interval, show_mode, lessons, dates, marks, show_without_marks = await repo.get_schedule(
+        query.from_user.id, item)
     manager.dialog_data['schedule_next_time'] = next_time
     show_mode = ShowModes(show_mode)
 
     if show_mode == ShowModes.DETAIL:
-        await manager.find('detail').set_checked(True)
+        await grades_select.set_detail_checked(manager)
     elif show_mode == ShowModes.SUMMARY:
-        await manager.find('summary').set_checked(True)
+        await grades_select.set_summary_checked(manager)
 
     if lessons != 'all':
         select_lessons = manager.find('select_lessons')
@@ -103,6 +101,7 @@ async def select_schedule(query, manager: DialogManager, item, grades):
         await manager.find('mark_date_select').set_checked(dates)
 
     manager.find('input_name').set_widget_data(manager, name)
+    await grades_select.set_show_without_marks(manager)
 
     await start_select(grades, manager)
 
@@ -148,9 +147,9 @@ async def on_save_schedule(query, button, manager: DialogManager):
     else:
         interval = -1
 
-    if manager.find('detail').is_checked():
+    if grades_select.is_detail_checked(manager):
         show_mode = ShowModes.DETAIL
-    elif manager.find('summary').is_checked():
+    elif grades_select.is_summary_checked(manager):
         show_mode = ShowModes.SUMMARY
     else:
         show_mode = ShowModes.DEFAULT
@@ -166,16 +165,18 @@ async def on_save_schedule(query, button, manager: DialogManager):
         dates = int(dates)
     name = manager.find('input_name').get_value()
 
+    show_without_marks = grades_select.is_show_without_marks_checked(manager)
+
     repo: Repo = manager.middleware_data['repo']
     if manager.dialog_data.get('new'):
         id = await repo.save_schedule(user_id, name, next_time, interval,
-                                      show_mode.value, lessons, dates, marks)
+                                      show_mode.value, lessons, dates, marks, show_without_marks)
         manager.start_data[:] = await repo.schedule_names(user_id)
         del manager.dialog_data['new']
     else:
         id = int(manager.dialog_data['schedule_id'])
         await repo.update_schedule(user_id, id, name, next_time, interval,
-                                   show_mode.value, lessons, dates, marks)
+                                   show_mode.value, lessons, dates, marks, show_without_marks)
     scheduler = manager.middleware_data['scheduler']
     scheduler.add_grades_task(manager, next_time, id)
     status.set(manager, 'отправка сохранена')

@@ -49,6 +49,23 @@ def is_detail_checked(manager):
     return detail_checked(None, None, manager)
 
 
+async def set_detail_checked(manager: DialogManager):
+    await manager.find('show_format').set_checked('статистика')
+    await manager.find('statistics_variant').set_checked('подробная')
+
+
+async def set_summary_checked(manager: DialogManager):
+    await manager.find('show_format').set_checked('статистика')
+    await manager.find('statistics_variant').set_checked('общая')
+
+
+async def set_show_without_marks(manager: DialogManager):
+    if is_detail_checked(manager):
+        await manager.find('show_without_marks_detail').set_checked(True)
+    else:
+        await manager.find('show_without_marks').set_checked(True)
+
+
 def create(lessons_state, lesson_date_state, date_state):
     select_lessons = SwitchTo(
         Format('выбрать предметы из списка'),

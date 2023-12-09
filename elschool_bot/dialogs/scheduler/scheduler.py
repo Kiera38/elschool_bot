@@ -9,7 +9,7 @@ from aiogram_dialog import DialogManager, Dialog, Window, BaseDialogManager, Sta
 from aiogram_dialog.widgets.text import Format
 
 from elschool_bot.dialogs.grades import (start_get_grades, process_result, filter_selected, filter_grades,
-                                         filter_marks, show_default, show_summary, show_detail)
+                                         filter_marks, show_default, show_summary, show_detail, filter_without_marks)
 from elschool_bot.repository import Repo
 from elschool_bot.windows import status
 
@@ -124,17 +124,17 @@ async def select_grades(grades, manager: DialogManager):
     id = manager.start_data['id']
     scheduler = manager.start_data['scheduler']
     repo: Repo = manager.middleware_data['repo']
-    _, _, _, next_time, interval, show_mode, lessons, date, marks = await repo.get_schedule(user_id, id)
+    _, _, _, next_time, interval, show_mode, lessons, date, marks, show_without_marks = await repo.get_schedule(user_id, id)
 
     marks_selected = {int(mark) for mark in marks.split(',')}
     if show_mode == 1:
         await show_summary(grades, manager, marks_selected, False)
         return
     else:
-        filters = ()
-        if lessons != 'all':
+        filters = (filter_without_marks(show_without_marks),)
+        if show_mode != 0 and lessons != 'all':
             selected = lessons.split(',')
-            filters = (filter_selected(selected),)
+            filters += (filter_selected(selected),)
 
         grades = filter_grades(grades, filters, (filter_marks(marks_selected), filter_mark_date(date)))
         if show_mode == 0:

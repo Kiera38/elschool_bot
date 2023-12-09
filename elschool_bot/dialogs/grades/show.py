@@ -196,9 +196,9 @@ async def show_summary(grades, manager, marks_selected, show_back=True):
                 less_mean.append(lesson)
 
     if max_mean[1] != 0:
-        text.append(f'{max_mean[1]} — <b>наибольшая</b> <i>средняя</i> оценка по <u>{max_mean[0]}</u>')
+        text.append(f'{max_mean[1]:.2f} — <b>наибольшая</b> <i>средняя</i> оценка по <u>{max_mean[0]}</u>')
     if min_mean[1] != 6:
-        text.append(f'{min_mean[1]} — <b>наименьшая</b> <i>средняя</i> оценка по <u>{min_mean[0]}</u>')
+        text.append(f'{min_mean[1]:.2f} — <b>наименьшая</b> <i>средняя</i> оценка по <u>{min_mean[0]}</u>')
 
     if greater_mean:
         greater_mean_lessons = ', '.join(greater_mean)
