@@ -232,12 +232,18 @@ class TextFromGetter(Text):
 
 async def on_start(start_data, manager: DialogManager):
     if isinstance(start_data, dict) and 'lessons' in start_data:
-        manager.dialog_data['current_lesson'] = list(start_data['lessons'])[0]
+        lessons = list(start_data['lessons'])
+        if not lessons:
+            manager.dialog_data['current_lesson'] = 'нет уроков'
+            manager.dialog_data['current_lesson_index'] = -1
+        manager.dialog_data['current_lesson'] = lessons[0]
         manager.dialog_data['current_lesson_index'] = 0
 
 
 async def on_back(query, button, manager: DialogManager):
     current_lesson_index = manager.dialog_data['current_lesson_index']
+    if current_lesson_index == -1:
+        return
     current_lesson_index -= 1
     lessons = manager.start_data['lessons']
     if current_lesson_index == 0:
@@ -248,6 +254,8 @@ async def on_back(query, button, manager: DialogManager):
 
 async def on_next(query, button, manager: DialogManager):
     current_lesson_index = manager.dialog_data['current_lesson_index']
+    if current_lesson_index == -1:
+        return
     current_lesson_index += 1
     lessons = manager.start_data['lessons']
     if current_lesson_index == len(lessons):
@@ -257,6 +265,9 @@ async def on_next(query, button, manager: DialogManager):
 
 
 async def on_select_current_lesson(event, select, manager: DialogManager, item):
+    if manager.dialog_data['current_lesson_index'] == -1:
+        await manager.switch_to(ShowStates.SHOW_BIG)
+        return
     item = int(item)
     manager.dialog_data['current_lesson'] = list(manager.start_data['lessons'])[item]
     manager.dialog_data['current_lesson_index'] = item
@@ -268,6 +279,8 @@ async def on_show_fix(event, checkbox, manager: DialogManager):
 
 
 def text_getter(data, text, manager: DialogManager):
+    if data['dialog_data']['current_lesson_index'] == -1:
+        return 'нет данных'
     lessons = data['start_data']['lessons']
     return lessons[data['dialog_data']['current_lesson']]
 
@@ -321,7 +334,7 @@ dialog = Dialog(
                 Format('{item[1]}'),
                 'select',
                 lambda item: item[0],
-                lambda data: list((i, lesson) for i, lesson in enumerate(data['start_data']['lessons'])),
+                lambda data: list((i, lesson) for i, lesson in enumerate(data['start_data']['lessons'] or ['нет уроков'])),
                 on_click=on_select_current_lesson
             ),
             width=2
