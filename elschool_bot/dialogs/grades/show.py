@@ -77,24 +77,25 @@ def format_fix_marks(added, mark):
     for add in added:
         text.append(', '.join(str(i) for i in add))
     text = '\n'.join(text)
-    return f'для <i>исправления</i> оценки до <b>{mark}</b> можно <u>получить</u>\n{text}'
+    return f'до <b>{mark}</b>:\n{text}'
 
 
 def fix_text(marks, mean):
     marks = [mark['mark'] for mark in marks]
+    title = '\nподсказки по исправлению:'
     if mean < 2.5:
         added_marks3 = fix_to3(marks)
         added_marks4 = fix_to4(marks)
         added_marks5 = fix_to5(marks)
-        return (f'\n{format_fix_marks(added_marks3, 3)}\n'
-                f'{format_fix_marks(added_marks4, 4)}\n{format_fix_marks(added_marks5, 5)}')
+        return (f'{title}\n{format_fix_marks(added_marks3, 3)}\n\n'
+                f'{format_fix_marks(added_marks4, 4)}\n\n{format_fix_marks(added_marks5, 5)}')
     if mean < 3.5:
         added_marks4 = fix_to4(marks)
         added_marks5 = fix_to5(marks)
-        return f'\n{format_fix_marks(added_marks4, 4)}\n{format_fix_marks(added_marks5, 5)}'
+        return f'{title}\n{format_fix_marks(added_marks4, 4)}\n\n{format_fix_marks(added_marks5, 5)}'
     elif mean < 4.5:
         added_marks = fix_to5(marks)
-        return '\n' + format_fix_marks(added_marks, 5)
+        return f'{title}\n{format_fix_marks(added_marks, 5)}'
     else:
         return ''
 
@@ -129,18 +130,18 @@ async def show_detail(grades, manager: DialogManager, show_back=True):
                 text.append(f'<b>эта</b> <i>средняя оценка</i> <b>меньше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
 
         if mean >= 4.5:
-            text.append('за <b>эту часть года</b> <u>должна</u> выйти 5')
+            text.append('при <b>этих выбранных оценках</b> <u>должна</u> выйти 5')
         elif mean >= 3.5:
-            text.append('за <b>эту часть года</b> <u>должна</u> выйти 4')
+            text.append('при <b>этих выбранных оценках</b> <u>должна</u> выйти 4')
         elif mean >= 2.5:
-            text.append('за <b>эту часть года</b> <u>должна</u> выйти 3')
+            text.append('при <b>этих выбранных оценках</b> <u>должна</u> выйти 3')
         elif mean > 0:
-            text.append('за <b>эту часть года</b> <u>должна</u> выйти 2')
+            text.append('при <b>этих выбранных оценках</b> <u>должна</u> выйти 2')
         else:
-            text.append('за <b>эту часть года</b> <u>нет оценок</u>. Нужно получить')
+            text.append('<u>нет оценок</u>. Нужно получить. А то ничего не выйдет.')
 
         marks_count = {5: 0, 4: 0, 3: 0, 2: 0}
-        marks_text = ['<u>список оценок</u> за <b>текущую</b> часть года:']
+        marks_text = ['<u>список выбранных оценок</u>:']
         for mark in marks:
             value = mark['mark']
             lesson_date = mark['lesson_date']
@@ -236,6 +237,7 @@ async def on_start(start_data, manager: DialogManager):
         if not lessons:
             manager.dialog_data['current_lesson'] = 'нет уроков'
             manager.dialog_data['current_lesson_index'] = -1
+            return
         manager.dialog_data['current_lesson'] = lessons[0]
         manager.dialog_data['current_lesson_index'] = 0
 
@@ -246,7 +248,7 @@ async def on_back(query, button, manager: DialogManager):
         return
     current_lesson_index -= 1
     lessons = manager.start_data['lessons']
-    if current_lesson_index == 0:
+    if current_lesson_index < 0:
         current_lesson_index = len(lessons) - 1
     manager.dialog_data['current_lesson'] = list(lessons)[current_lesson_index]
     manager.dialog_data['current_lesson_index'] = current_lesson_index
@@ -258,7 +260,7 @@ async def on_next(query, button, manager: DialogManager):
         return
     current_lesson_index += 1
     lessons = manager.start_data['lessons']
-    if current_lesson_index == len(lessons):
+    if current_lesson_index >= len(lessons):
         current_lesson_index = 0
     manager.dialog_data['current_lesson'] = list(lessons)[current_lesson_index]
     manager.dialog_data['current_lesson_index'] = current_lesson_index

@@ -98,24 +98,24 @@ def filter_mark_date(date):
     if date is None:
         return None
 
-    now = datetime.datetime.now()
+    now = datetime.date.today()
 
     if date == 0:
         def filt(value):
             day, month, year = value['date'].split('.')
-            return now.day == int(day)
+            return now == datetime.date(int(year), int(month), int(day))
         return filt
 
     if date == 1:
         def filt(value):
             day, month, year = value['date'].split('.')
-            return now.weekday() == datetime.datetime(int(year), int(month), int(day)).weekday()
+            return now.weekday() == datetime.date(int(year), int(month), int(day)).weekday()
         return filt
 
     if date == 2:
         def filt(value):
             day, month, year = value['date'].split('.')
-            return now.month == int(month)
+            return now.month == int(month) and now.year == int(year)
         return filt
 
 
