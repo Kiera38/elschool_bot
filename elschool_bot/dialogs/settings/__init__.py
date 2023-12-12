@@ -2,7 +2,8 @@ from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import User, CallbackQuery
 from aiogram_dialog import Dialog, Window, DialogManager
-from aiogram_dialog.widgets.kbd import Button, Row, Select
+from aiogram_dialog.widgets.input import TextInput
+from aiogram_dialog.widgets.kbd import Button, Row, Select, SwitchTo
 from aiogram_dialog.widgets.text import Const, Format
 
 from elschool_bot.repository import Repo
@@ -15,6 +16,7 @@ from elschool_bot.windows import status
 class States(StatesGroup):
     MAIN = State()
     GET_QUARTER_DATA = State()
+    EDIT_CACHE_TIME = State()
 
 
 async def on_result(data, result_data, manager: DialogManager):
@@ -70,9 +72,23 @@ async def on_privacy_policy(query, button, manager: DialogManager):
 
 
 async def on_version(query, button, manager: DialogManager):
-    await status.update(manager, '''моя версия: 3.0.1
+    await status.update(manager, '''моя версия: 3.1.1.dev1
 
 Список изменений:
+в 3.1.1:
+Исправления ошибок: 
+В подробной статистике писалось в нескольких местах писалось за текущую часть года, но из-за фильтрации это могли быть оценки за более маленький промежуток времени. Теперь там написано из выбранных.
+В подробной статистике при пролистывании предметов назад бот мог начать считать, что оценок нет совсем, хотя они были.
+Исправлена фильтрация оценок в автоматической отправке, если выбрать промежуток времени, за который нужно показывать оценки.
+Изменён текст для показа подсказок по исправлению. Теперь он больше соответствует новому стилю.
+
+в 3.1.0:
+Добавлена возможность выбирать конкретный предмет из списка в подробном режиме показа оценок. Просто переключаться на следующий или предыдущий можно как и раньше.
+Предметы без оценок теперь скрываются, но это можно настроить.
+Статистика оценок. Общая и по каждому предмету.
+Меню настройки показа оценок обновлено. Теперь оно более понятно.
+Улучшено оформление бота. Теперь в тексте важные части выделены.
+
 в 3.0.1:
 Различные исправления ошибок и улучшение кода
 
@@ -120,10 +136,54 @@ async def on_register(query, button, manager: DialogManager):
                            ('', ''), check_get_grades=True)
 
 
+async def on_input_cache_time(message, widget, manager: DialogManager, text: str):
+    text = text.split()
+    try:
+        if len(text) == 1:
+            text = text[0].split(':')
+            if len(text) == 1:
+                seconds = int(text[0])
+            elif len(text) == 2:
+                minutes = int(text[0])
+                seconds = int(text[1]) + minutes * 60
+            elif len(text) == 3:
+                hours = int(text[0])
+                minutes = int(text[1]) + hours * 60
+                seconds = int(text[2]) + minutes * 60
+            else:
+                status.set(manager, 'сохранять оценки на несколько дней это слишком много. '
+                                    'Я должен показывать все изменения.')
+                await manager.switch_to(States.MAIN)
+                return
+        elif len(text) % 2 == 0:
+            seconds = 0
+            for text1, text2 in zip(text[::2], text[1::2]):
+                if text2 in ('секунда', 'секунд'):
+                    seconds += int(text1)
+                elif text2 in ('минута', 'минут'):
+                    seconds += int(text1) * 60
+                elif text2 in ('час', 'часов'):
+                    seconds += int(text1) * 3600
+                else:
+                    status.set(manager, 'я не могу сохранять оценки на такое время.')
+                    await manager.switch_to(States.MAIN)
+                    return
+        else:
+            status.set(manager, 'я не могу сохранять оценки на такое время.')
+            await manager.switch_to(States.MAIN)
+            return
+    except ValueError:
+        status.set(manager, 'какое-то странное время ты написал. Я не могу понять. '
+                            'Где-то вместо числа написано что-то, не похожее на число.')
+        await manager.switch_to(States.MAIN)
+        return
+    repo: Repo = manager.middleware_data['repo']
+    await repo.set_cache_time(message.from_user.id, seconds)
+
+
 dialog = Dialog(
     Window(
         status.create_status_widget(),
-        Button(Const('политика конфиденциальности'), 'privacy_policy', on_privacy_policy),
         Button(Const('регистрация'), 'register', on_register, when=~F['registered']),
         Row(
             Button(Const('изменить данные'), 'edit_data', on_edit_data),
@@ -132,7 +192,11 @@ dialog = Dialog(
         ),
         Row(
             Button(Const('версия'), 'version', on_click=on_version),
-            Button(Const('изменить часть года'), 'change_quarter', on_click=on_change_quarter)
+            Button(Const('политика конфиденциальности'), 'privacy_policy', on_privacy_policy),
+        ),
+        Row(
+            Button(Const('часть года'), 'change_quarter', on_click=on_change_quarter),
+            SwitchTo(Const('время кеширования'), 'change_cache_time', States.EDIT_CACHE_TIME)
         ),
         state=States.MAIN
     ),
@@ -146,6 +210,15 @@ dialog = Dialog(
             on_click=on_quarter_select
         ),
         state=States.GET_QUARTER_DATA
+    ),
+    Window(
+        Const('Чтобы не мучать постоянными запросами сервер elschool, я на некоторое время сохраняю оценки. '
+              'Сейчас ты можешь написать мне время, которое я не буду обновлять твои оценки '
+              'после предыдущего получения. Стандартное время 1 час. '
+              'Можно писать по разному. Например 20 минут 10 секунд или 20:10 или 21 минута или 1200 секунд.'),
+        TextInput('cache_time', on_success=on_input_cache_time),
+        SwitchTo(Const('отмена'), 'cancel_cache_time', States.MAIN),
+        state=States.EDIT_CACHE_TIME
     ),
     on_process_result=on_result,
     getter=get_data,

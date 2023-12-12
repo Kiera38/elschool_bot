@@ -9,8 +9,7 @@ from elschool_bot.dialogs import input_data
 from elschool_bot.repository import RegisterError
 from elschool_bot.widgets import grades_select
 from elschool_bot.widgets.ru_calendar import RuCalendar
-from elschool_bot.windows import select_lessons
-from elschool_bot.windows import status
+from elschool_bot.windows import select_lessons, status
 from .show import ShowStates, show_summary, show_detail, show_default
 
 
@@ -30,8 +29,8 @@ async def start_get_grades(manager: DialogManager):
     except RegisterError as e:
         status_text = manager.dialog_data['status']
         message = e.args[0]
-        login, password = await repo.get_user_data(manager.event.from_user.id)
         text = f'{status_text}, произошла ошибка:\n{message}. Скорее всего elschool обновил токен.'
+        login, password = await repo.get_user_data(manager.event.from_user.id)
         if login is None and password is None:
             await input_data.start(['логин', 'пароль'], (f'{text} У меня не сохранены твои данные', ''),
                                    manager, check_get_grades=False)
@@ -144,6 +143,7 @@ async def on_select_date(event, widget, manager: DialogManager, date: datetime.d
 def filter_grades(grades, filters, value_filters):
     filters = [filt for filt in filters if filt is not None]
     value_filters = [filt for filt in value_filters if filt is not None]
+
     if not filters and not value_filters:
         return grades
 
@@ -155,20 +155,17 @@ def filter_grades(grades, filters, value_filters):
     if not value_filters:
         value_filters = [default_filter]
 
-    # filtered_grades = {}
-    # for key, values in grades.items():
-    #     if all(filt(key, values) for filt in filters):
-    #         new_values = []
-    #         for value in values:
-    #             if all(filt(value) for filt in value_filters):
-    #                 new_values.append(value)
-    #         filtered_grades[key] = new_values
-    #
-    # return filtered_grades
-    return {key: [value for value in values
-                  if all(filt(value) for filt in value_filters)]
-            for key, values in grades.items()
-            if all(filt(key, values) for filt in filters)}
+    filtered_grades = {}
+    for key, values in grades.items():
+        new_values = []
+        for value in values:
+            if all(filt(value) for filt in value_filters):
+                new_values.append(value)
+
+        if all(filt(key, new_values) for filt in filters):
+            filtered_grades[key] = new_values
+
+    return filtered_grades
 
 
 def filter_selected(selected):
@@ -206,12 +203,19 @@ def filter_date(date):
 
 
 def filter_marks(marks_selected):
-    if marks_selected == {5, 4, 3, 2}:
-        return None
-
     def filt(value):
         mark = value['mark']
         return mark in marks_selected
+
+    return filt
+
+
+def filter_without_marks(disabled=False):
+    if disabled:
+        return None
+
+    def filt(name, values):
+        return values
 
     return filt
 
@@ -220,23 +224,25 @@ async def on_show(query, button, manager: DialogManager):
     grades = manager.dialog_data['grades']
     marks_selected = {int(mark) for mark in manager.find('marks_selector').get_checked()}
 
-    if manager.find('summary').is_checked():
+    if grades_select.is_summary_checked(manager):
         await show_summary(grades, manager, marks_selected)
         return
 
     selected = set()
-    if not manager.find('select_all').is_checked():
+    is_detail_checked = grades_select.is_detail_checked(manager)
+    if not is_detail_checked and not manager.find('select_all').is_checked():
         selected = manager.find('select_lessons').get_checked()
         lesson_names = list(grades)
         selected = {lesson_names[int(i)] for i in selected}
 
     date = manager.dialog_data.get('date')
     lesson_date = manager.dialog_data.get('lesson_date')
+    show_without_marks = grades_select.is_show_without_marks_checked(manager)
 
-    grades = filter_grades(grades, (filter_selected(selected),),
+    grades = filter_grades(grades, (filter_selected(selected), filter_without_marks(show_without_marks)),
                            (filter_lesson_date(lesson_date), filter_date(date), filter_marks(marks_selected)))
 
-    if manager.find('detail').is_checked():
+    if is_detail_checked:
         await show_detail(grades, manager)
         return
 
@@ -255,9 +261,7 @@ async def on_del_date(query, button, manager: DialogManager):
 
 async def on_start(data, manager: DialogManager):
     status.set(manager, 'оценки')
-    marks = manager.find('marks_selector')
-    for i in range(2, 6):
-        await marks.set_checked(str(i), True)
+    await grades_select.on_start(manager)
 
 
 async def getter_date(dialog_manager: DialogManager, **kwargs):

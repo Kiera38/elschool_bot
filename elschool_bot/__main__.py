@@ -11,7 +11,7 @@ from elschool_bot.dialogs import register_handlers, set_commands
 
 async def main():
     logging.basicConfig(level=logging.DEBUG)
-    bot = Bot(os.environ['BOT_TOKEN'])
+    bot = Bot(os.environ['BOT_TOKEN'], parse_mode='html')
     dispatcher = Dispatcher(storage=MemoryStorage())
     register_handlers(dispatcher, Config('bot.db'))
     await set_commands(bot)
