@@ -101,24 +101,40 @@ class RangeCalendar(Calendar):
         data = self.get_widget_data(manager, {})
         return data.get("end_date")
 
+    def get_date_range(self, manager):
+        data = self.get_widget_data(manager, {})
+        return data.get("start_date"), data.get("end_date")
+
     async def set_date_range(self, manager, start_date, end_date):
-        assert start_date <= end_date
+        if start_date is not None and end_date is not None:
+            assert start_date <= end_date
+            await self.on_range_selected.process_event(manager.event, self, manager, start_date, end_date)
         data = self.get_widget_data(manager, {})
         data['start_date'] = start_date
         data['end_date'] = end_date
-        await self.on_range_selected.process_event(manager.event, self, manager, start_date, end_date)
 
     async def _render_keyboard(
             self,
             data,
             manager: DialogManager,
     ) -> List[List[InlineKeyboardButton]]:
-        widget_data = self.get_widget_data(manager, {})
+        start_date, end_date = self.get_date_range(manager)
         data = {
-            "start_date": widget_data.get("start_date"),
-            "end_date": widget_data.get("end_date"),
+            "start_date": start_date,
+            "end_date": end_date,
             "data": data
         }
         return await super()._render_keyboard(data, manager)
 
-
+    async def _handle_click_date(
+            self, data: str, manager: DialogManager,
+    ) -> None:
+        await super()._handle_click_date(data, manager)
+        raw_date = int(data)
+        selected_date = date.fromtimestamp(raw_date)
+        start_date, end_date = self.get_date_range(manager)
+        if start_date is None:
+            start_date = selected_date
+        else:
+            end_date = selected_date
+        await self.set_date_range(manager, start_date, end_date)
