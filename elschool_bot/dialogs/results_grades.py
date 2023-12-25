@@ -23,12 +23,12 @@ async def start(manager: DialogManager):
 async def show_results(manager, results):
     text = ['итоговые оценки:']
     for lesson, marks in results.items():
-        lesson_text = [f'{lesson}:']
+        lesson_text = [f'<b>{lesson}</b>:']
         for name, mark in marks.items():
             if mark:
-                lesson_text.append(f'{name}: {mark}')
+                lesson_text.append(f'{name}: <b>{mark}</b>')
             else:
-                lesson_text.append(f'нет итоговой оценки за {name}')
+                lesson_text.append(f'<b>нет</b> итоговой оценки за {name}')
         text.append('\n'.join(lesson_text))
     await status.update(manager, '\n\n'.join(text))
 
