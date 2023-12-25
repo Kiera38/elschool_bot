@@ -83,7 +83,7 @@ dialog = Dialog(
         Const('выбери диапазон дат'),
         RuRangeCalendar('select_date_range'),
         Button(Const('сбросить'), 'cancel_date_range', on_cancel_date_range),
-        Button(Const('готово'), 'complete_select_date_range'),
+        Button(Const('готово'), 'complete_select_date_range', on_select_date_range),
         Cancel(Const('отмена'), result='clear_dates'),
         state=DateSelectorStates.SELECT_DATE_RANGE
     ),

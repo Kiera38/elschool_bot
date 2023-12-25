@@ -1,14 +1,13 @@
 import datetime
 
 from aiogram.fsm.state import StatesGroup, State
-from aiogram_dialog import Dialog, Window, DialogManager, StartMode, ShowMode
-from aiogram_dialog.widgets.kbd import Button, SwitchTo
-from aiogram_dialog.widgets.text import Const, Format
+from aiogram_dialog import Dialog, DialogManager, StartMode, ShowMode
+from aiogram_dialog.widgets.kbd import Button
+from aiogram_dialog.widgets.text import Const
 
 from elschool_bot.dialogs import input_data
 from elschool_bot.repository import RegisterError
 from elschool_bot.widgets import grades_select
-from elschool_bot.widgets.ru_calendar import RuCalendar
 from elschool_bot.windows import select_lessons, status
 from .show import ShowStates, show_summary, show_detail, show_default
 
@@ -27,36 +26,42 @@ async def start_get_grades(manager: DialogManager):
     try:
         grades = await repo.get_grades(manager.event.from_user.id)
     except RegisterError as e:
-        status_text = manager.dialog_data['status']
-        message = e.args[0]
-        text = f'{status_text}, произошла ошибка:\n{message}. Скорее всего elschool обновил токен.'
-        login, password = await repo.get_user_data(manager.event.from_user.id)
-        if login is None and password is None:
-            await input_data.start(['логин', 'пароль'], (f'{text} У меня не сохранены твои данные', ''),
-                                   manager, check_get_grades=False)
-        elif login is None:
-            manager.dialog_data.update(password=password)
-            await input_data.start(['логин'], (f'{text} У меня не сохранён твой пароль', ''),
-                                   manager, check_get_grades=False, value=password)
-        elif password is None:
-            manager.dialog_data.update(login=login)
-            await input_data.start(['пароль'], (f'{text} У меня не сохранён твой логин', ''),
-                                   manager, check_get_grades=False, value=login)
-        else:
-            await status.update(manager, f'{text}. Сейчас обновлю у себя', show_mode=ShowMode.EDIT)
-            try:
-                jwtoken = await repo.check_register_user(login, password)
-            except RegisterError as e:
-                status_text = manager.dialog_data['status']
-                message = e.args[0]
-                if e.login is not None and e.password is not None:
-                    message = f'{e.args[0]}. Твой логин {e.login} и пароль {e.password}?'
-                await status.update(manager, f'{status_text}\n{message}')
-            else:
-                return await update_token(login, password, jwtoken, manager, 'всё')
-
+        if await handle_register_error(manager, repo, e):
+            return await get_grades_after_error(manager, repo)
     else:
         return grades
+
+
+async def handle_register_error(manager, repo, error):
+    status_text = manager.dialog_data['status']
+    message = error.args[0]
+    text = f'{status_text}, произошла ошибка:\n{message}. Скорее всего elschool обновил токен.'
+    login, password = await repo.get_user_data(manager.event.from_user.id)
+    if login is None and password is None:
+        await input_data.start(['логин', 'пароль'], (f'{text} У меня не сохранены твои данные', ''),
+                               manager, check_get_grades=False)
+    elif login is None:
+        manager.dialog_data.update(password=password)
+        await input_data.start(['логин'], (f'{text} У меня не сохранён твой пароль', ''),
+                               manager, check_get_grades=False, value=password)
+    elif password is None:
+        manager.dialog_data.update(login=login)
+        await input_data.start(['пароль'], (f'{text} У меня не сохранён твой логин', ''),
+                               manager, check_get_grades=False, value=login)
+    else:
+        await status.update(manager, f'{text}. Сейчас обновлю у себя', show_mode=ShowMode.EDIT)
+        try:
+            jwtoken = await repo.check_register_user(login, password)
+        except RegisterError as e:
+            status_text = manager.dialog_data['status']
+            message = e.args[0]
+            if e.login is not None and e.password is not None:
+                message = f'{e.args[0]}. Твой логин {e.login} и пароль {e.password}?'
+            await status.update(manager, f'{status_text}\n{message}')
+        else:
+            await update_token(login, password, jwtoken, manager, 'всё')
+            return True
+    return False
 
 
 async def start_select_grades(manager: DialogManager):
@@ -79,9 +84,12 @@ async def update_token(login, password, jwtoken, manager, save_data):
         await repo.update_data(user_id, jwtoken, password=password)
     else:
         await repo.update_data(user_id, jwtoken)
+
+
+async def get_grades_after_error(manager, repo):
     await status.update(manager, 'данные введены правильно, теперь попробую получить оценки')
     try:
-        grades = await repo.get_grades(user_id)
+        grades = await repo.get_grades(manager.event.from_user.id)
     except RegisterError as e:
         status_text = manager.dialog_data['status']
         message = e.args[0]
@@ -91,6 +99,11 @@ async def update_token(login, password, jwtoken, manager, save_data):
 
 
 async def process_result(start_data, result, manager: DialogManager):
+    if await process_results_without_grades(start_data, result, manager):
+        return await get_grades_after_error(manager, manager.middleware_data['repo'])
+
+
+async def process_results_without_grades(start_data, result, manager):
     if not isinstance(start_data, dict):
         return
     input_data = start_data.get('inputs')
@@ -105,7 +118,7 @@ async def process_result(start_data, result, manager: DialogManager):
         save_data = 'пароль'
     else:
         save_data = 'логин'
-    return await update_token(login, password, jwtoken, manager, save_data)
+    return update_token(login, password, jwtoken, manager, save_data)
 
 
 async def on_process_result(start_data: dict, result, manager: DialogManager):
@@ -194,7 +207,9 @@ def filter_lesson_date(lesson_date, name):
     def filt_range(value):
         val_lesson_date = value[name]
         day, month, year = val_lesson_date.split('.')
-        lesson_date = datetime.date(year, month, day)
+        if int(year) == 0:
+            return False
+        lesson_date = datetime.date(int(year), int(month), int(day))
         return start <= lesson_date <= end
 
     return filt_range

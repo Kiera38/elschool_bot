@@ -179,6 +179,17 @@ class Repo:
             schedules[user_id].append({'id': id, 'next_time': next_time})
         return schedules
 
+    async def get_results(self, user_id):
+        cursor = await self.db.execute('SELECT jwtoken, url FROM users WHERE id=?', (user_id,))
+        jwtoken, url = await cursor.fetchone()
+        elschool = ElschoolRepo()
+        if url:
+            return await elschool.get_results(jwtoken, url)
+        else:
+            results, url = await elschool.get_results_and_url(jwtoken)
+            await self.db.execute('UPDATE users SET url=?', (url,))
+            return results
+
 
 class RepoMiddleware(BaseMiddleware):
     def __init__(self, dbfile):
@@ -282,6 +293,57 @@ class ElschoolRepo:
                 return grades[quarter]
         except Exception as e:
             raise DataProcessError(f'при обработке данных возникла ошибка: {e}') from e
+        return grades
+
+    async def _get_results_grades(self, session, url: str):
+        url = url.replace('grades', 'results')
+        logger.info(f'получаем итоговые оценки с {url}')
+        response = await session.get(url, ssl=False)
+        _check_response(response, url, 'не удалось получить оценки с сервера')
+        text = await response.text()
+
+        try:
+            bs = BeautifulSoup(text, 'html.parser')
+            table = bs.find('table', class_='ResultsTable')
+            if not table:
+                raise DataProcessError('на странице не найдена таблица с оценками')
+            thead = table.find('thead')
+            if not thead:
+                raise DataProcessError('на странице не найден блок для заголовков')
+            ths = thead.find_all('th')
+            if not ths:
+                raise DataProcessError('на странице не найдены заголовки с названиями частей года')
+            quarters = [th.text.strip() for th in ths if not th.attrs][1:]
+            results = {}
+            tbody = table.find('tbody')
+            if not tbody:
+                raise DataProcessError('на странице не найдено тело таблицы')
+            trs = tbody.find_all('tr')
+            if not trs:
+                raise DataProcessError('в таблице нет строк с уроками')
+            for tr in trs:
+                lesson = tr.find('td').text.strip()
+                lesson_results = {}
+                for quarter, td in zip(quarters, tr.find_all('td', class_='results-mark')):
+                    text = td.text.strip()
+                    if not text:
+                        lesson_results[quarter] = None
+                    else:
+                        lesson_results[quarter] = int(text)
+                results[lesson] = lesson_results
+            return results
+        except Exception as e:
+            raise DataProcessError(f'при обработке данных возникла ошибка: {e}') from e
+
+    async def get_results_and_url(self, jwtoken):
+        async with aiohttp.ClientSession(cookies={'JWToken': jwtoken}) as session:
+            url = await self._get_url(session)
+            grades = await self._get_results_grades(session, url)
+        return grades, url
+
+    async def get_results(self, jwtoken, url):
+        async with aiohttp.ClientSession(cookies={'JWToken': jwtoken}) as session:
+            grades = await self._get_results_grades(session, url)
         return grades
 
     async def get_grades_and_url(self, jwtoken, quarter=None):

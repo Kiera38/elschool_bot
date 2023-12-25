@@ -162,4 +162,4 @@ class ManagedRangeCalendar(ManagedWidget[RangeCalendar]):
         return self.widget.get_date_range(self.manager)
 
     async def set_date_range(self, start_date, end_date):
-        await self.set_date_range(start_date, end_date)
+        await self.widget.set_date_range(self.manager, start_date, end_date)

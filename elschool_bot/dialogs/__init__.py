@@ -8,13 +8,13 @@ from aiogram_dialog import DialogManager, StartMode, setup_dialogs
 from aiogram_dialog.api.entities import DIALOG_EVENT_NAME
 
 from elschool_bot.repository import RepoMiddleware, Repo, DataProcessError, RegisterError
-from . import settings, grades, input_data, scheduler, date_selector
+from . import settings, grades, input_data, scheduler, date_selector, results_grades
 from .grades import start_select_grades
 from .scheduler.scheduler import Scheduler, SchedulerMiddleware
 
 router = Router()
 main_menu = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='оценки')],
+    [KeyboardButton(text='оценки'), KeyboardButton(text='итоговые оценки')],
     [KeyboardButton(text='отправка по времени'), KeyboardButton(text='настройки')]
 ], resize_keyboard=True)
 logger = logging.getLogger(__name__)
@@ -54,6 +54,7 @@ async def show_menu(message: Message):
     await message.answer('основное меню', reply_markup=main_menu)
 
 
+@router.message(Command('schedules'))
 @router.message(F.text == 'отправка по времени')
 async def schedules(message: Message, dialog_manager, repo):
     if not await repo.has_user(message.from_user.id):
@@ -64,6 +65,19 @@ async def schedules(message: Message, dialog_manager, repo):
         return
     logger.debug(f'пользователь с id {message.from_user.id} решил по управлять своими отправками по времени')
     await scheduler.show(dialog_manager)
+
+
+@router.message(Command('resultsgrades'))
+@router.message(F.text == 'итоговые оценки')
+async def results(message: Message, dialog_manager, repo):
+    if not await repo.has_user(message.from_user.id):
+        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
+                     f'решил посмотреть свои итоговые оценки.')
+        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
+                             'Это можно сделать на вкладке настройки.')
+        return
+    logger.debug(f'пользователь с id {message.from_user.id} решил посмотреть свои итоговые оценки')
+    await results_grades.start(dialog_manager)
 
 
 @router.message(Command('restoreschedules'))
@@ -131,6 +145,7 @@ def register_handlers(dp: Dispatcher, config):
 
     dp.include_router(input_data.dialog)
     dp.include_router(date_selector.dialog)
+    dp.include_router(results_grades.dialog)
 
 
 async def set_commands(bot: Bot):

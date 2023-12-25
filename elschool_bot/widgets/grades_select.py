@@ -82,14 +82,16 @@ def process_result(result, manager: DialogManager):
     if 'start_lesson_date' in manager.dialog_data:
         del manager.dialog_data['start_lesson_date']
         if result == 'clear_dates':
-            del manager.dialog_data['lesson_dates']
+            if 'lesson_dates' in manager.dialog_data:
+                del manager.dialog_data['lesson_dates']
         else:
             manager.dialog_data['lesson_dates'] = result
         return True
     if 'start_date' in manager.dialog_data:
         del manager.dialog_data['start_date']
         if result == 'clear_dates':
-            del manager.dialog_data['dates']
+            if 'dates' in manager.dialog_data:
+                del manager.dialog_data['dates']
         else:
             manager.dialog_data['dates'] = result
         return True

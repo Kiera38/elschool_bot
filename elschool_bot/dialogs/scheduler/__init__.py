@@ -301,7 +301,14 @@ dialog = Dialog(
         state=SchedulerStates.SELECT_WHEN,
         getter=getter
     ),
-    status.create(SchedulerStates.STATUS),
+    status.create(
+        SchedulerStates.STATUS,
+        SwitchTo(
+            Const('к списку отправок'),
+            'to_schedules_list',
+            SchedulerStates.SCHEDULES_LIST
+        )
+    ),
     Window(
         Const('введи время в формате часы:минуты, когда нужно мне отправить'),
         TextInput('input_custom_time', on_success=on_input_custom_time),
