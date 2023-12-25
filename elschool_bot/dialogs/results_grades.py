@@ -1,5 +1,5 @@
 from aiogram.fsm.state import StatesGroup, State
-from aiogram_dialog import DialogManager, Dialog, Window
+from aiogram_dialog import DialogManager, Dialog, Window, ShowMode
 from aiogram_dialog.widgets.text import Format
 
 from elschool_bot.dialogs import grades
@@ -27,10 +27,9 @@ async def show_results(manager, results):
         for name, mark in marks.items():
             if mark:
                 lesson_text.append(f'{name}: <b>{mark}</b>')
-            else:
-                lesson_text.append(f'<b>нет</b> итоговой оценки за {name}')
+
         text.append('\n'.join(lesson_text))
-    await status.update(manager, '\n\n'.join(text))
+    await status.update(manager, '\n\n'.join(text), ShowMode.EDIT)
 
 
 async def get_results(manager, repo):
