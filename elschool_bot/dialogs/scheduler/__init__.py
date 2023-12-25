@@ -257,7 +257,7 @@ dialog = Dialog(
             SwitchTo(Const('название'), 'name', SchedulerStates.INPUT_NAME),
             SwitchTo(Const('показывать'), 'when_show', SchedulerStates.SELECT_WHEN),
         ),
-        *grades_select.create(SchedulerStates.SELECT_LESSONS, None, SchedulerStates.SELECT_DATE),
+        *grades_select.create(SchedulerStates.SELECT_LESSONS, False),
         Row(
             SwitchTo(Const('отмена'), 'cancel', SchedulerStates.SCHEDULES_LIST, on_cancel_schedule),
             Button(Const('удалить'), 'delete', when=~F['dialog_data'].get('new'), on_click=on_delete),

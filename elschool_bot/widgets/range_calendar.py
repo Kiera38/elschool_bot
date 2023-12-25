@@ -4,13 +4,10 @@ from typing import Union, Optional, List, Dict
 
 from aiogram.types import InlineKeyboardButton
 from aiogram_dialog import DialogManager
-
-from aiogram_dialog.widgets.common import WhenCondition
+from aiogram_dialog.widgets.common import WhenCondition, ManagedWidget
 from aiogram_dialog.widgets.kbd.calendar_kbd import OnDateSelected, CalendarConfig, CalendarDaysView, DATE_TEXT, \
     TODAY_TEXT, WEEK_DAY_TEXT, DAYS_HEADER_TEXT, ZOOM_OUT_TEXT, NEXT_MONTH_TEXT, PREV_MONTH_TEXT, Calendar
 from aiogram_dialog.widgets.widget_event import WidgetEventProcessor, ensure_event_processor
-
-from elschool_bot.widgets.ru_calendar import RuCalendar
 
 
 def _is_date_selected(cur_date, data):
@@ -40,9 +37,9 @@ class RangeCalendarDaysView(CalendarDaysView):
                          date_text, today_text, weekday_text, header_text,
                          zoom_out_text, next_month_text, prev_month_text)
         if selected_date_text is None:
-            selected_date_text = '✓ ' + date_text
+            selected_date_text = '✓' + date_text
         if selected_today_text is None:
-            selected_today_text = '✓ ' + today_text
+            selected_today_text = '✓' + today_text
         self.selected_date_text = selected_date_text
         self.selected_today_text = selected_today_text
 
@@ -135,6 +132,34 @@ class RangeCalendar(Calendar):
         start_date, end_date = self.get_date_range(manager)
         if start_date is None:
             start_date = selected_date
+        elif end_date is None:
+            end_date = max(start_date, selected_date)
+            start_date = min(start_date, selected_date)
+        elif selected_date < start_date:
+            start_date = selected_date
+        elif selected_date - start_date < end_date - selected_date:
+            start_date = selected_date
         else:
             end_date = selected_date
+
         await self.set_date_range(manager, start_date, end_date)
+
+    def managed(self, manager: DialogManager) -> "ManagedRangeCalendar":
+        return ManagedRangeCalendar(self, manager)
+
+
+class ManagedRangeCalendar(ManagedWidget[RangeCalendar]):
+    def cancel_selected(self):
+        self.widget.cancel_selected(self.manager)
+
+    def get_start_date(self):
+        return self.widget.get_start_date(self.manager)
+
+    def get_end_date(self):
+        return self.widget.get_end_date(self.manager)
+
+    def get_date_range(self):
+        return self.widget.get_date_range(self.manager)
+
+    async def set_date_range(self, start_date, end_date):
+        await self.set_date_range(start_date, end_date)

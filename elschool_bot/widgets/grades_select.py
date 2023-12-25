@@ -1,6 +1,8 @@
 from aiogram_dialog import DialogManager
-from aiogram_dialog.widgets.kbd import SwitchTo, Row, Multiselect, Radio, Checkbox
+from aiogram_dialog.widgets.kbd import SwitchTo, Row, Multiselect, Radio, Checkbox, Start, Button
 from aiogram_dialog.widgets.text import Format, Const
+
+from elschool_bot.dialogs.date_selector import DateSelectorStates
 
 
 def not_statistics_checked(data, widget, manager):
@@ -66,27 +68,55 @@ async def set_show_without_marks(manager: DialogManager):
         await manager.find('show_without_marks').set_checked(True)
 
 
-def create(lessons_state, lesson_date_state, date_state):
+async def on_start_lesson_date(event, button, manager: DialogManager):
+    manager.dialog_data['start_lesson_date'] = True
+    await manager.start(DateSelectorStates.SELECT_VARIANT, manager.dialog_data.get('lesson_dates'))
+
+
+async def on_start_date(event, button, manager: DialogManager):
+    manager.dialog_data['start_date'] = True
+    await manager.start(DateSelectorStates.SELECT_VARIANT, manager.dialog_data.get('dates'))
+
+
+def process_result(result, manager: DialogManager):
+    if 'start_lesson_date' in manager.dialog_data:
+        del manager.dialog_data['start_lesson_date']
+        if result == 'clear_dates':
+            del manager.dialog_data['lesson_dates']
+        else:
+            manager.dialog_data['lesson_dates'] = result
+        return True
+    if 'start_date' in manager.dialog_data:
+        del manager.dialog_data['start_date']
+        if result == 'clear_dates':
+            del manager.dialog_data['dates']
+        else:
+            manager.dialog_data['dates'] = result
+        return True
+    return False
+
+
+def create(lessons_state, lesson_date_state):
     select_lessons = SwitchTo(
         Format('выбрать предметы из списка'),
         'lessons_picked',
         lessons_state,
         when=not_statistics_checked
     )
-    select_date = SwitchTo(
+    select_date = Button(
         Format('дата проставления'),
         'date',
-        date_state
+        on_start_date
     )
 
-    if lesson_date_state is not None:
+    if lesson_date_state:
         center = (
             select_lessons,
             Row(
-                SwitchTo(
+                Button(
                     Format('дата урока'),
                     'date_lesson',
-                    lesson_date_state
+                    on_start_lesson_date
                 ),
                 select_date,
                 when=not_summary_checked

@@ -118,6 +118,8 @@ async def on_process_result(start_data: dict, result, manager: DialogManager):
     grades = await process_result(start_data, result, manager)
     if grades:
         await show_select(grades, manager)
+        return
+    grades_select.process_result(result, manager)
 
 
 async def show_select(grades, manager: DialogManager):
@@ -128,16 +130,6 @@ async def show_select(grades, manager: DialogManager):
     )
     await manager.switch_to(GradesStates.SELECT)
     await manager.show(ShowMode.EDIT)
-
-
-async def on_select_lesson_date(event, widget, manager: DialogManager, date: datetime.date):
-    manager.dialog_data['lesson_date'] = date
-    await manager.switch_to(GradesStates.SELECT)
-
-
-async def on_select_date(event, widget, manager: DialogManager, date: datetime.date):
-    manager.dialog_data['date'] = date
-    await manager.switch_to(GradesStates.SELECT)
 
 
 def filter_grades(grades, filters, value_filters):
@@ -178,28 +170,34 @@ def filter_selected(selected):
     return filt
 
 
-def filter_lesson_date(lesson_date):
+def filter_lesson_date(lesson_date, name):
     if not lesson_date:
         return None
 
-    def filt(value):
-        val_lesson_date = value['lesson_date']
+    if 'months' in lesson_date:
+        months = [
+            'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+            'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'
+        ]
+        months = [months.index(month) + 1 for month in lesson_date['months']]
+
+        def filt_months(value):
+            val_lesson_date = value[name]
+            day, month, year = val_lesson_date.split('.')
+            return int(month) in months
+
+        return filt_months
+
+    start = lesson_date['start']
+    end = lesson_date['end']
+
+    def filt_range(value):
+        val_lesson_date = value[name]
         day, month, year = val_lesson_date.split('.')
-        return int(year) == lesson_date.year and int(month) == lesson_date.month and int(day) == lesson_date.day
+        lesson_date = datetime.date(year, month, day)
+        return start <= lesson_date <= end
 
-    return filt
-
-
-def filter_date(date):
-    if not date:
-        return None
-
-    def filt(value):
-        val_date = value['date']
-        day, month, year = val_date.split('.')
-        return int(year) == date.year and int(month) == date.month and int(day) == date.day
-
-    return filt
+    return filt_range
 
 
 def filter_marks(marks_selected):
@@ -235,28 +233,19 @@ async def on_show(query, button, manager: DialogManager):
         lesson_names = list(grades)
         selected = {lesson_names[int(i)] for i in selected}
 
-    date = manager.dialog_data.get('date')
-    lesson_date = manager.dialog_data.get('lesson_date')
+    dates = manager.dialog_data.get('dates')
+    lesson_dates = manager.dialog_data.get('lesson_dates')
     show_without_marks = grades_select.is_show_without_marks_checked(manager)
 
     grades = filter_grades(grades, (filter_selected(selected), filter_without_marks(show_without_marks)),
-                           (filter_lesson_date(lesson_date), filter_date(date), filter_marks(marks_selected)))
+                           (filter_lesson_date(lesson_dates, 'lesson_date'),
+                            filter_lesson_date(dates, 'date'), filter_marks(marks_selected)))
 
     if is_detail_checked:
         await show_detail(grades, manager)
         return
 
     await show_default(grades, manager)
-
-
-async def on_del_lesson_date(query, button, manager: DialogManager):
-    manager.dialog_data.pop('lesson_date', None)
-    await manager.switch_to(GradesStates.SELECT)
-
-
-async def on_del_date(query, button, manager: DialogManager):
-    manager.dialog_data.pop('date', None)
-    await manager.switch_to(GradesStates.SELECT)
 
 
 async def on_start(data, manager: DialogManager):
@@ -282,25 +271,9 @@ dialog = Dialog(
     status.create(
         GradesStates.SELECT,
         Button(Const('показать'), 'show', on_click=on_show),
-        *grades_select.create(GradesStates.SELECT_LESSONS, GradesStates.SELECT_LESSON_DATE, GradesStates.SELECT_DATE)
+        *grades_select.create(GradesStates.SELECT_LESSONS, True)
     ),
     select_lessons.create(GradesStates.SELECT_LESSONS, GradesStates.SELECT),
-    Window(
-        Format('выбери дату урока. Можно выбрать 1 дату. {lesson_date}'),
-        RuCalendar('lesson_date_calendar', on_click=on_select_lesson_date),
-        Button(Const('сбросить'), 'del_lesson_date', on_del_lesson_date),
-        SwitchTo(Const('назад'), '', GradesStates.SELECT),
-        state=GradesStates.SELECT_LESSON_DATE,
-        getter=getter_lesson_date
-    ),
-    Window(
-        Format('выбери дату проставления оценки. Можно выбрать 1 дату. {date}'),
-        RuCalendar('date_calendar', on_click=on_select_date),
-        Button(Const('сбросить'), 'del_lesson_date', on_del_date),
-        SwitchTo(Const('назад'), '', GradesStates.SELECT),
-        state=GradesStates.SELECT_DATE,
-        getter=getter_date
-    ),
     status.create(GradesStates.STATUS),
     on_process_result=on_process_result,
     on_start=on_start

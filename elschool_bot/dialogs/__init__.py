@@ -8,7 +8,7 @@ from aiogram_dialog import DialogManager, StartMode, setup_dialogs
 from aiogram_dialog.api.entities import DIALOG_EVENT_NAME
 
 from elschool_bot.repository import RepoMiddleware, Repo, DataProcessError, RegisterError
-from . import settings, grades, input_data, scheduler
+from . import settings, grades, input_data, scheduler, date_selector
 from .grades import start_select_grades
 from .scheduler.scheduler import Scheduler, SchedulerMiddleware
 
@@ -130,6 +130,7 @@ def register_handlers(dp: Dispatcher, config):
     scheduler.register_handlers(dp)
 
     dp.include_router(input_data.dialog)
+    dp.include_router(date_selector.dialog)
 
 
 async def set_commands(bot: Bot):
