@@ -153,6 +153,8 @@ async def set_commands(bot: Bot):
         BotCommand(command='/start', description='запустить бота'),
         BotCommand(command='/showmenu', description='показать меню'),
         BotCommand(command='/settings', description='показать настройки'),
-        BotCommand(command='/grades', description='показать оценки')
+        BotCommand(command='/grades', description='показать оценки'),
+        BotCommand(command='/schedules', description='показать отправки'),
+        BotCommand(command='/resultsgrades', description='показать итоговые оценки')
     ]
     await bot.set_my_commands(commands)
