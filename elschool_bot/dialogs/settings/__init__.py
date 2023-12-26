@@ -72,7 +72,7 @@ async def on_privacy_policy(query, button, manager: DialogManager):
 
 
 async def on_version(query, button, manager: DialogManager):
-    await status.update(manager, '''моя версия: 3.2.0.dev3
+    await status.update(manager, '''моя версия: 3.2.0.dev5
 
 Список изменений:
 в 3.2.0:

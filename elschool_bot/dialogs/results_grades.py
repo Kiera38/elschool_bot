@@ -22,14 +22,36 @@ async def start(manager: DialogManager):
 
 async def show_results(manager, results):
     text = ['итоговые оценки:']
+    marks_count = {}
     for lesson, marks in results.items():
-        lesson_text = [f'<b>{lesson}</b>:']
+        text.append(f'<b>{lesson}</b>:')
+        need_new_line = False
         for name, mark in marks.items():
             if mark:
-                lesson_text.append(f'{name}: <b>{mark}</b>')
+                text.append(f'{name}: <b>{mark}</b>')
+                need_new_line = True
+            if name not in marks_count:
+                marks_count[name] = {2: 0, 3: 0, 4: 0, 5: 0, None: 0}
+            marks_count[name][mark] += 1
+        if need_new_line:
+            text[-1] = text[-1] + '\n'
 
-        text.append('\n'.join(lesson_text))
-    await status.update(manager, '\n\n'.join(text), ShowMode.EDIT)
+    count_text = []
+    for name, marks in marks_count.items():
+        if marks[2] == 0 and marks[3] == 0 and marks[4] == 0 and marks[5] == 0:
+            continue
+        name_text = [f'за <u>{name}</u> у вас:']
+        for mark, count in marks.items():
+            if mark is None:
+                name_text.append(f'ещё <b>нет</b> итоговых оценок по <b>{count}</b> предметам')
+                continue
+            if count:
+                name_text.append(f'<b>{count}</b> - "{mark}"')
+            else:
+                name_text.append(f'<b>нет</b> "{mark}"')
+        count_text.append('\n'.join(name_text))
+    text = '\n'.join(text)
+    await status.update(manager, '\n\n'.join(count_text)+'\n\n'+text, ShowMode.EDIT)
 
 
 async def get_results(manager, repo):
