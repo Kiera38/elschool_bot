@@ -58,7 +58,7 @@ dialog = Dialog(
         SwitchTo(Const('выбрать месяцы'), 'switch_to_months', DateSelectorStates.SELECT_MONTHS),
         Button(Const('текущая неделя'), 'select_week', on_select_current_week),
         SwitchTo(Const('диапазон дат'), 'switch_to_date_range', DateSelectorStates.SELECT_DATE_RANGE),
-        Cancel(Const('отмена'), result='clear_dates'),
+        Cancel(Const('отмена')),
         state=DateSelectorStates.SELECT_VARIANT
     ),
     Window(
@@ -76,7 +76,7 @@ dialog = Dialog(
         ),
         Button(Const('сбросить'), 'cancel_months', on_cancel_months),
         Button(Const('готово'), 'complete_select_months', on_select_months),
-        Cancel(Const('отмена'), result='clear_dates'),
+        Cancel(Const('отмена')),
         state=DateSelectorStates.SELECT_MONTHS
     ),
     Window(
@@ -84,7 +84,7 @@ dialog = Dialog(
         RuRangeCalendar('select_date_range'),
         Button(Const('сбросить'), 'cancel_date_range', on_cancel_date_range),
         Button(Const('готово'), 'complete_select_date_range', on_select_date_range),
-        Cancel(Const('отмена'), result='clear_dates'),
+        Cancel(Const('отмена')),
         state=DateSelectorStates.SELECT_DATE_RANGE
     ),
     on_start=on_start

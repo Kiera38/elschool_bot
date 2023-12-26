@@ -193,6 +193,8 @@ def filter_lesson_date(lesson_date, name):
             'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'
         ]
         months = [months.index(month) + 1 for month in lesson_date['months']]
+        if not months:
+            return None
 
         def filt_months(value):
             val_lesson_date = value[name]
@@ -203,6 +205,8 @@ def filter_lesson_date(lesson_date, name):
 
     start = lesson_date['start']
     end = lesson_date['end']
+    if not start or not end:
+        return
 
     def filt_range(value):
         val_lesson_date = value[name]
