@@ -1,3 +1,4 @@
+import datetime
 import logging
 import random
 import time
@@ -190,6 +191,59 @@ class Repo:
             await self.db.execute('UPDATE users SET url=?', (url,))
             return results
 
+    async def get_diaries(self, user_id, date: datetime.date):
+        async with self.db.cursor() as cursor:
+            await cursor.execute('SELECT schedule_last_cache, cache_time, jwtoken, url FROM users WHERE id=?',
+                                 (user_id,))
+            last_cache, cache_time, jwtoken, url = await cursor.fetchone()
+            if time.time() - last_cache > cache_time:
+                logger.debug('время кеширования прошло, нужно получить новое')
+                return await self._update_diaries_cache(cursor, user_id, jwtoken, url, date)
+
+            await cursor.execute('SELECT number, name, start_time, end_time, homework WHERE user_id=? AND date=?',
+                                 (user_id, date.strftime('%d.%m.%Y')))
+            diaries = {}
+            lesson_numbers = {}
+            async for number, name, start_time, end_time, homework in cursor:
+                diaries[number, name] = {
+                    'start_time': start_time,
+                    'end_time': end_time,
+                }
+                if name not in lesson_numbers or lesson_numbers[name] > number:
+                    lesson_numbers[name] = number
+
+            if not diaries:
+                return await self._update_diaries_cache(cursor, user_id, jwtoken, url, date)
+
+            await cursor.execute('SELECT lesson_name, date, mark FROM schedule_cache WHERE user_id=? AND lesson_date=?',
+                                 (user_id, date.strftime('%d.%m.%Y')))
+            async for name, date, mark in cursor:
+                number = lesson_numbers[name]
+                lesson = diaries[number, name]
+                if 'marks' not in lesson:
+                    lesson['marks'] = []
+                lesson['marks'].append({'date': date, 'mark': mark})
+            return diaries
+
+    async def _update_diaries_cache(self, cursor: aiosqlite.Cursor, user_id, jwtoken, url, date):
+        elschool = ElschoolRepo()
+        if url:
+            diaries = await elschool.get_diaries(jwtoken, url, date)
+            await cursor.execute('UPDATE users SET schedule_last_cache=? WHERE id=?', (time.time(), user_id))
+        else:
+            diaries, url = await elschool.get_diaries_and_url(jwtoken, date)
+            await cursor.execute('UPDATE users SET schedule_last_cache=?, url=? WHERE id=?',
+                                 (time.time(), url, user_id))
+        await cursor.execute('DELETE FROM schedule_cache WHERE user_id=?', (user_id,))
+        data = []
+        for day_date, day in diaries.items():
+            if day is None:
+                continue
+            for (number, name), lesson in day.items():
+                data.append((user_id, day_date, number, name, lesson['start_time'], lesson['end_time'], lesson['homework']))
+        await cursor.executemany('INSERT INTO schedule_cache VALUES (?, ?, ?, ?, ?, ?, ?)', data)
+        return diaries[date.strftime('%d.%m.%Y')]
+
 
 class RepoMiddleware(BaseMiddleware):
     def __init__(self, dbfile):
@@ -362,6 +416,70 @@ class ElschoolRepo:
         if not a:
             raise DataProcessError('на странице дневника не найдена ссылка на страницу с оценками')
         return 'https://elschool.ru/users/diaries/' + a['href']
+
+    async def _get_diaries(self, session: aiohttp.ClientSession, url, date):
+        url = url.replace('grades', 'details') + f'&year={date.year}&week={date.isocalendar()[1]}'
+        response = await session.get(url, ssl=False)
+        _check_response(response, url, 'не удалось получить расписание с сервера')
+        text = await response.content.read()
+        try:
+            bs = BeautifulSoup(text, 'html.parser')
+            days = {}
+            for div in bs.find('div', class_='diaries').find_all('div'):
+                table = div.find('table', class_='table')
+                if table is None:
+                    continue
+                for tbody in table.find_all('tbody'):
+                    trs = tbody.find_all('tr', class_='diary__lesson')
+                    if not trs:
+                         continue
+                    day = trs[0].find('td', class_='diary__dayweek').text.strip()
+                    if '\xa0' in day:
+                        day = day.split('\xa0', 1)[1].strip()
+                    else:
+                        day = day.split(' ', 1)[1]
+                    day = f'{day}.{date.year}'
+                    if len(trs) == 1 and trs[0].find('td', class_='diary__nolesson') is not None:
+                        days[day] = None
+                        continue
+                    lessons = {}
+                    for tr in trs:
+                        td_discipline = tr.find('td', class_='diary__discipline')
+                        number, name = td_discipline.find('div', class_='flex-grow-1').text.split('. ', 1)
+                        number = int(number)
+                        start_time, end_time = (td_discipline.find('div', class_='diary__discipline__time')
+                                                .text.split('-'))
+                        homework = (tr.find('td', class_='diary__homework')
+                                    .find('div', class_='diary__homework-text').text.strip())
+                        marks = []
+                        for mark in tr.find('td', class_='diary__marks').find_all('span', class_='diary__mark'):
+                            mark_date = mark.attrs['data-popover-content'].split(':')[1]
+                            mark_value = int(mark.text.strip())
+                            marks.append({
+                                'mark': mark_value,
+                                'date': mark_date.strip()
+                            })
+                        lessons[number, name] = {
+                            'start_time': start_time.strip(),
+                            'end_time': end_time.strip(),
+                            'homework': homework,
+                            'marks': marks
+                        }
+                    days[day] = lessons
+            return days
+        except Exception as e:
+            raise DataProcessError(f'при обработке данных возникла ошибка: {e}') from e
+
+    async def get_diaries(self, jwtoken, url, date):
+        async with aiohttp.ClientSession(cookies={'JWToken': jwtoken}) as session:
+            diaries = await self._get_diaries(session, url, date)
+        return diaries
+
+    async def get_diaries_and_url(self, jwtoken, date):
+        async with aiohttp.ClientSession(cookies={'JWToken': jwtoken}) as session:
+            url = await self._get_url(session)
+            diaries = await self._get_diaries(session, url, date)
+        return diaries, url
 
 
 class RandomRepo:

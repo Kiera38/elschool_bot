@@ -69,7 +69,7 @@ class Scheduler:
 
     async def show_grades(self, manager: BaseDialogManager, id, delay):
         await asyncio.sleep(delay)
-        await manager.start(SchedulerShowStates.STATUS, {'scheduler': self, 'id': id}, StartMode.NEW_STACK)
+        await manager.start(SchedulerShowStates.STATUS, {'notifications': self, 'id': id}, StartMode.NEW_STACK)
 
     async def restore_grades_task(self, manager: DialogManager):
         repo = manager.middleware_data['repo']
@@ -90,7 +90,7 @@ class SchedulerMiddleware(BaseMiddleware):
     async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
                        event: TelegramObject,
                        data: Dict[str, Any]) -> Any:
-        data['scheduler'] = self.scheduler
+        data['notifications'] = self.scheduler
         await handler(event, data)
 
 
@@ -122,7 +122,7 @@ def filter_mark_date(date):
 async def select_grades(grades, manager: DialogManager):
     user_id = manager.event.from_user.id
     id = manager.start_data['id']
-    scheduler = manager.start_data['scheduler']
+    scheduler = manager.start_data['notifications']
     repo: Repo = manager.middleware_data['repo']
     _, _, _, next_time, interval, show_mode, lessons, date, marks, show_without_marks = await repo.get_schedule(user_id, id)
 

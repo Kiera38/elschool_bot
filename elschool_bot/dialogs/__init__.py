@@ -8,9 +8,9 @@ from aiogram_dialog import DialogManager, StartMode, setup_dialogs
 from aiogram_dialog.api.entities import DIALOG_EVENT_NAME
 
 from elschool_bot.repository import RepoMiddleware, Repo, DataProcessError, RegisterError
-from . import settings, grades, input_data, scheduler, date_selector, results_grades
+from . import settings, grades, input_data, notifications, date_selector, results_grades
 from .grades import start_select_grades
-from .scheduler.scheduler import Scheduler, SchedulerMiddleware
+from .notifications.scheduler import Scheduler, SchedulerMiddleware
 
 router = Router()
 main_menu = ReplyKeyboardMarkup(keyboard=[
@@ -64,7 +64,7 @@ async def schedules(message: Message, dialog_manager, repo):
                              'Это можно сделать на вкладке настройки.')
         return
     logger.debug(f'пользователь с id {message.from_user.id} решил по управлять своими отправками по времени')
-    await scheduler.show(dialog_manager)
+    await notifications.show(dialog_manager)
 
 
 @router.message(Command('resultsgrades'))
@@ -81,9 +81,9 @@ async def results(message: Message, dialog_manager, repo):
 
 
 @router.message(Command('restoreschedules'))
-async def restore_schedules(message: Message, dialog_manager: DialogManager, scheduler):
+async def restore_schedules(message: Message, dialog_manager: DialogManager, notifications):
     logger.info(f'разработчик с id {message.from_user.id} решил восстановить отправки по времени')
-    await scheduler.restore_grades_task(dialog_manager)
+    await notifications.restore_grades_task(dialog_manager)
     await message.answer('все отправки восстановлены')
 
 
@@ -141,7 +141,7 @@ def register_handlers(dp: Dispatcher, config):
 
     settings.register_handlers(dp)
     grades.register_handlers(dp)
-    scheduler.register_handlers(dp)
+    notifications.register_handlers(dp)
 
     dp.include_router(input_data.dialog)
     dp.include_router(date_selector.dialog)

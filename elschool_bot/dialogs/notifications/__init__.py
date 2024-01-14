@@ -8,7 +8,7 @@ from aiogram_dialog.widgets.kbd import Button, Column, Select, Row, Checkbox, Sw
 from aiogram_dialog.widgets.text import Const, Format
 
 from elschool_bot.dialogs.grades import start_get_grades, process_result
-from elschool_bot.dialogs.scheduler import scheduler
+from elschool_bot.dialogs.notifications import scheduler
 from elschool_bot.repository import Repo
 from elschool_bot.widgets import grades_select
 from elschool_bot.windows import select_lessons, status
@@ -65,7 +65,7 @@ async def start_select(grades, manager: DialogManager):
 async def select_schedule(query, manager: DialogManager, item, grades):
     item = int(item)
     repo: Repo = manager.middleware_data['repo']
-    scheduler = manager.middleware_data['scheduler']
+    scheduler = manager.middleware_data['notifications']
     scheduler.remove_grades_task(query.from_user.id, item)
     _, _, name, next_time, interval, show_mode, lessons, dates, marks, show_without_marks = await repo.get_schedule(
         query.from_user.id, item)
@@ -128,7 +128,7 @@ async def on_process_result(start_data, result, manager: DialogManager):
 async def on_cancel_schedule(query, button, manager: DialogManager):
     manager.dialog_data.clear()
     if id := manager.dialog_data.get('schedule_id'):
-        scheduler = manager.middleware_data['scheduler']
+        scheduler = manager.middleware_data['notifications']
         next_time = manager.dialog_data['schedule_next_time']
         scheduler.add_grades_task(manager, next_time, id)
 
@@ -177,7 +177,7 @@ async def on_save_schedule(query, button, manager: DialogManager):
         id = int(manager.dialog_data['schedule_id'])
         await repo.update_schedule(user_id, id, name, next_time, interval,
                                    show_mode.value, lessons, dates, marks, show_without_marks)
-    scheduler = manager.middleware_data['scheduler']
+    scheduler = manager.middleware_data['notifications']
     scheduler.add_grades_task(manager, next_time, id)
     status.set(manager, 'отправка сохранена')
     await manager.switch_to(SchedulerStates.STATUS)
@@ -186,7 +186,7 @@ async def on_save_schedule(query, button, manager: DialogManager):
 async def on_delete(query, button, manager: DialogManager):
     repo: Repo = manager.middleware_data['repo']
     await repo.remove_schedule(query.from_user.id, manager.dialog_data['schedule_id'])
-    scheduler = manager.middleware_data['scheduler']
+    scheduler = manager.middleware_data['notifications']
     scheduler.remove_grades_task(query.from_user.id, manager.dialog_data['schedule_id'])
     manager.start_data[:] = await repo.schedule_names(query.from_user.id)
     await manager.switch_to(SchedulerStates.SCHEDULES_LIST)
