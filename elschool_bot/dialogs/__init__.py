@@ -8,12 +8,13 @@ from aiogram_dialog import DialogManager, StartMode, setup_dialogs
 from aiogram_dialog.api.entities import DIALOG_EVENT_NAME
 
 from elschool_bot.repository import RepoMiddleware, Repo, DataProcessError, RegisterError
-from . import settings, grades, input_data, notifications, date_selector, results_grades
+from . import settings, grades, input_data, notifications, date_selector, results_grades, schedule
 from .grades import start_select_grades
 from .notifications.scheduler import Scheduler, SchedulerMiddleware
 
 router = Router()
 main_menu = ReplyKeyboardMarkup(keyboard=[
+    [KeyboardButton(text='расписание')],
     [KeyboardButton(text='оценки'), KeyboardButton(text='итоговые оценки')],
     [KeyboardButton(text='отправка по времени'), KeyboardButton(text='настройки')]
 ], resize_keyboard=True)
@@ -78,6 +79,12 @@ async def results(message: Message, dialog_manager, repo):
         return
     logger.debug(f'пользователь с id {message.from_user.id} решил посмотреть свои итоговые оценки')
     await results_grades.start(dialog_manager)
+
+
+@router.message(Command('schedule'))
+@router.message(F.text == 'расписание')
+async def show_schedule(message, dialog_manager):
+    await schedule.start(dialog_manager)
 
 
 @router.message(Command('restoreschedules'))
@@ -146,6 +153,7 @@ def register_handlers(dp: Dispatcher, config):
     dp.include_router(input_data.dialog)
     dp.include_router(date_selector.dialog)
     dp.include_router(results_grades.dialog)
+    dp.include_router(schedule.dialog)
 
 
 async def set_commands(bot: Bot):
@@ -155,6 +163,7 @@ async def set_commands(bot: Bot):
         BotCommand(command='/settings', description='показать настройки'),
         BotCommand(command='/grades', description='показать оценки'),
         BotCommand(command='/schedules', description='показать отправки'),
-        BotCommand(command='/resultsgrades', description='показать итоговые оценки')
+        BotCommand(command='/resultsgrades', description='показать итоговые оценки'),
+        BotCommand(command='/schedule', description='показать расписание')
     ]
     await bot.set_my_commands(commands)

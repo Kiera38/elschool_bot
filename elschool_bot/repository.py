@@ -200,7 +200,8 @@ class Repo:
                 logger.debug('время кеширования прошло, нужно получить новое')
                 return await self._update_diaries_cache(cursor, user_id, jwtoken, url, date)
 
-            await cursor.execute('SELECT number, name, start_time, end_time, homework WHERE user_id=? AND date=?',
+            await cursor.execute('SELECT number, name, start_time, end_time, homework '
+                                 'FROM schedule_cache WHERE user_id=? AND date=?',
                                  (user_id, date.strftime('%d.%m.%Y')))
             diaries = {}
             lesson_numbers = {}
@@ -215,7 +216,7 @@ class Repo:
             if not diaries:
                 return await self._update_diaries_cache(cursor, user_id, jwtoken, url, date)
 
-            await cursor.execute('SELECT lesson_name, date, mark FROM schedule_cache WHERE user_id=? AND lesson_date=?',
+            await cursor.execute('SELECT lesson_name, date, mark FROM grades WHERE user_id=? AND lesson_date=?',
                                  (user_id, date.strftime('%d.%m.%Y')))
             async for name, date, mark in cursor:
                 number = lesson_numbers[name]
@@ -242,6 +243,7 @@ class Repo:
             for (number, name), lesson in day.items():
                 data.append((user_id, day_date, number, name, lesson['start_time'], lesson['end_time'], lesson['homework']))
         await cursor.executemany('INSERT INTO schedule_cache VALUES (?, ?, ?, ?, ?, ?, ?)', data)
+        await self.db.commit()
         return diaries[date.strftime('%d.%m.%Y')]
 
 
