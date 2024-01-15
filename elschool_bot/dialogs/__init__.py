@@ -14,7 +14,7 @@ from .notifications.scheduler import Scheduler, SchedulerMiddleware
 
 router = Router()
 main_menu = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='расписание')],
+    [KeyboardButton(text='расписание'), KeyboardButton(text='расписание звонков')],
     [KeyboardButton(text='оценки'), KeyboardButton(text='итоговые оценки')],
     [KeyboardButton(text='отправка по времени'), KeyboardButton(text='настройки')]
 ], resize_keyboard=True)
@@ -85,6 +85,12 @@ async def results(message: Message, dialog_manager, repo):
 @router.message(F.text == 'расписание')
 async def show_schedule(message, dialog_manager):
     await schedule.start(dialog_manager)
+
+
+@router.message(Command('timeschedule'))
+@router.message(F.text == 'расписание звонков')
+async def show_time_schedule(message, dialog_manager):
+    await schedule.start_time_schedule(dialog_manager)
 
 
 @router.message(Command('restoreschedules'))
