@@ -155,11 +155,11 @@ def register_handlers(dp: Dispatcher, config):
     settings.register_handlers(dp)
     grades.register_handlers(dp)
     notifications.register_handlers(dp)
+    schedule.register_handlers(dp)
 
     dp.include_router(input_data.dialog)
     dp.include_router(date_selector.dialog)
     dp.include_router(results_grades.dialog)
-    dp.include_router(schedule.dialog)
 
 
 async def set_commands(bot: Bot):

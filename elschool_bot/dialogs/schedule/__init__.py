@@ -1,14 +1,16 @@
 import datetime
 
-from aiogram import F
+from aiogram import F, Router
 from aiogram.fsm.state import StatesGroup, State
-from aiogram_dialog import Dialog, Window, DialogManager
+from aiogram_dialog import ChatEvent, Dialog, Window, DialogManager
 from aiogram_dialog.widgets.text import Format, Const, List, Multi
+from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo
 
 from elschool_bot.dialogs import grades
 from elschool_bot.repository import Repo, RegisterError
 from elschool_bot.widgets.ru_calendar import RuCalendar
 from elschool_bot.windows import status
+from . import edit
 
 
 class ScheduleStates(StatesGroup):
@@ -16,6 +18,7 @@ class ScheduleStates(StatesGroup):
     STATUS = State()
     SHOW = State()
     SHOW_TIME_SCHEDULE = State()
+    SELECT_DEFAULT_EDIT_DAY = State()
 
 
 async def start(manager: DialogManager):
@@ -26,9 +29,10 @@ async def start_time_schedule(manager: DialogManager):
     await manager.start(ScheduleStates.STATUS, 'time')
 
 
-async def on_select_day(event, calendar, manager: DialogManager, date):
+async def on_select_day(event: ChatEvent, widget: ManagedCalendar, manager: DialogManager, date):
     repo: Repo = manager.middleware_data['repo']
     await manager.switch_to(ScheduleStates.STATUS)
+    await manager.show()
     schedule = await get_schedule(manager, repo, date)
     if schedule:
         await show_schedule(manager, schedule)
@@ -41,8 +45,8 @@ def as_datetime(time):
 
 
 async def show_schedule(manager: DialogManager, schedule):
-    lessons = [{'number': number, 'name': name, **lesson} for (number, name), lesson in schedule.items()]
-    manager.dialog_data['lessons'] = lessons
+    lessons = manager.dialog_data['lessons'] = list(schedule.values())
+    manager.dialog_data['schedule'] = schedule
     if manager.dialog_data.get('time'):
         now = datetime.datetime.utcnow() + datetime.timedelta(hours=5)
         end_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -73,9 +77,12 @@ async def show_schedule(manager: DialogManager, schedule):
         await manager.switch_to(ScheduleStates.SHOW)
 
 
-async def get_schedule_after_error(manager, repo, date):
+async def get_schedule_after_error(manager, repo: Repo, date):
     try:
-        schedule = await repo.get_schedule(manager.event.from_user.id, date)
+        schedule = await repo.get_diaries(manager.event.from_user.id, date)
+        if isinstance(schedule, str):
+            await status.update(manager, schedule)
+            return None
     except RegisterError as e:
         status_text = manager.dialog_data['status']
         message = e.args[0]
@@ -88,7 +95,11 @@ async def get_schedule(manager: DialogManager, repo: Repo, date):
     try:
         manager.dialog_data['date'] = date
         schedule = await repo.get_diaries(manager.event.from_user.id, date)
+        if isinstance(schedule, str):
+            await status.update(manager, schedule)
+            return None
     except RegisterError as e:
+        status.set(manager, 'получение расписания')
         if await grades.handle_register_error(manager, repo, e):
             return await get_schedule_after_error(manager, repo, date)
     else:
@@ -96,12 +107,34 @@ async def get_schedule(manager: DialogManager, repo: Repo, date):
 
 
 async def on_process_result(start_data, result, manager):
-    if grades.process_results_without_grades(start_data, result, manager):
+    if await grades.process_results_without_grades(start_data, result, manager):
         repo = manager.middleware_data['repo']
         date = manager.dialog_data['date']
         schedule = await get_schedule_after_error(manager, repo, date)
         if schedule:
-            await show_schedule(manager, schedule)
+            if manager.dialog_data['default_edit']:
+                weekday = date.isocalendar()[2]
+                await edit.start(schedule, weekday, manager)
+            else:
+                await show_schedule(manager, schedule)
+
+
+async def on_edit(event, button, manager: DialogManager):
+    await edit.start(manager.dialog_data['schedule'], manager.dialog_data['date'], manager)
+
+
+async def on_default_edit(event, select, manager: DialogManager, item):
+    weekday = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница'].index(item) + 1
+    await manager.switch_to(ScheduleStates.STATUS)
+    await manager.show()
+    repo = manager.middleware_data['repo']
+    today = datetime.date.today()
+    today_weekday = today.isocalendar()[2]
+    date = today + datetime.timedelta(days=today_weekday-weekday)
+    manager.dialog_data['default_edit'] = True
+    schedule = await get_schedule(manager, repo, date)
+    if schedule:
+        await edit.start(schedule, weekday, manager)
 
 
 async def getter(dialog_manager, **kwargs):
@@ -116,6 +149,7 @@ async def on_start(data, manager: DialogManager):
         manager.dialog_data['time'] = True
         repo: Repo = manager.middleware_data['repo']
         date = datetime.date.today()
+        await manager.switch_to(ScheduleStates.STATUS)
         schedule = await get_schedule(manager, repo, date)
         if schedule:
             await show_schedule(manager, schedule)
@@ -125,6 +159,7 @@ dialog = Dialog(
     Window(
         Const('выбери день'),
         RuCalendar('date_selector', on_click=on_select_day),
+        SwitchTo(Const('стандартные изменения'), 'default_edit'),
         state=ScheduleStates.SELECT_DAY),
     Window(Format('{status}'), state=ScheduleStates.STATUS, getter=getter),
     Window(
@@ -138,6 +173,7 @@ dialog = Dialog(
             items=F['dialog_data']['lessons'],
             sep='\n\n'
         ),
+        Button(Const('изменения в расписании'), 'edit', on_click=on_edit),
         state=ScheduleStates.SHOW
     ),
     Window(
@@ -148,6 +184,17 @@ dialog = Dialog(
         ),
         state=ScheduleStates.SHOW_TIME_SCHEDULE
     ),
+    Window(
+        Const('выбери день, для которого хочешь указать изменения'),
+        Select(Format('{item}'), 'weekday_selector', lambda item: item,
+               ['понедельник', 'вторник', 'среда', 'четверг', 'пятница'],
+               on_click=on_default_edit)
+    ),
     on_process_result=on_process_result,
     on_start=on_start
 )
+
+
+def register_handlers(router: Router):
+    router.include_router(dialog)
+    router.include_router(edit.dialog)

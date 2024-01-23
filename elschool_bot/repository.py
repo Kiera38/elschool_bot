@@ -91,8 +91,9 @@ class Repo:
             await cursor.execute('UPDATE users SET last_cache=? WHERE id=?', (time.time(), user_id))
         else:
             grades, url = await elschool.get_grades_and_url(jwtoken, quarter)
-            await cursor.execute('UPDATE users SET last_cache=?, url=? WHERE id=?',
-                                 (time.time(), url, user_id))
+            class_id = self._class_id_from_url(url)
+            await cursor.execute('UPDATE users SET last_cache=?, url=?, class_id=? WHERE id=?',
+                                 (time.time(), url, class_id, user_id))
         data = []
         for name, marks in grades.items():
             if not marks:
@@ -189,42 +190,78 @@ class Repo:
         else:
             results, url = await elschool.get_results_and_url(jwtoken)
             await self.db.execute('UPDATE users SET url=?', (url,))
+            await self.db.commit()
             return results
 
     async def get_diaries(self, user_id, date: datetime.date):
+        if date.isocalendar()[2] == 7:
+            return 'сегодня нет расписания. Тебе оно зачем понадобилось?'
         async with self.db.cursor() as cursor:
-            await cursor.execute('SELECT schedule_last_cache, cache_time, jwtoken, url FROM users WHERE id=?',
-                                 (user_id,))
-            last_cache, cache_time, jwtoken, url = await cursor.fetchone()
-            if time.time() - last_cache > cache_time:
-                logger.debug('время кеширования прошло, нужно получить новое')
-                return await self._update_diaries_cache(cursor, user_id, jwtoken, url, date)
-
-            await cursor.execute('SELECT number, name, start_time, end_time, homework '
-                                 'FROM schedule_cache WHERE user_id=? AND date=?',
-                                 (user_id, date.strftime('%d.%m.%Y')))
-            diaries = {}
-            lesson_numbers = {}
-            async for number, name, start_time, end_time, homework in cursor:
-                diaries[number, name] = {
-                    'start_time': start_time,
-                    'end_time': end_time,
-                }
-                if name not in lesson_numbers or lesson_numbers[name] > number:
-                    lesson_numbers[name] = number
-
-            if not diaries:
-                return await self._update_diaries_cache(cursor, user_id, jwtoken, url, date)
-
-            await cursor.execute('SELECT lesson_name, date, mark FROM grades WHERE user_id=? AND lesson_date=?',
-                                 (user_id, date.strftime('%d.%m.%Y')))
-            async for name, date, mark in cursor:
-                number = lesson_numbers[name]
-                lesson = diaries[number, name]
-                if 'marks' not in lesson:
-                    lesson['marks'] = []
-                lesson['marks'].append({'date': date, 'mark': mark})
+            diaries = await self._get_diaries(cursor, user_id, date)
+            default_changes = await self._get_diaries_changes(cursor, user_id, date.isocalendar()[2])
+            changes = await self._get_diaries_changes(cursor, user_id, self._as_timestamp(date))
+            self._apply_diaries_changes(default_changes, diaries)
+            self._apply_diaries_changes(changes, diaries)
             return diaries
+
+    def _apply_diaries_changes(self, changes, diaries):
+        for change in changes:
+            number = change['number']
+            if change['name']:
+                diaries[number]['name'] = change['name']
+            if change['start_time']:
+                diaries[number]['start_time'] = change['start_time']
+            if change['end_time']:
+                diaries[number]['end_time'] = change['end_time']
+            if change['homework']:
+                diaries[number]['homework'] = change['homework']
+
+    def _as_timestamp(self, date: datetime.date):
+        return datetime.datetime(date.year, date.month, date.day).timestamp()
+
+    async def _get_diaries_changes(self, cursor: aiosqlite.Cursor, user_id, timestamp):
+        await cursor.execute('SELECT class_id FROM users WHERE id=?', (user_id,))
+        class_id = (await cursor.fetchone())[0]
+        await cursor.execute('SELECT number, name, start_time, end_time, homework FROM schedule_changes '
+                             'WHERE class_id=? AND date=?', (class_id, timestamp))
+        changes = list(await cursor.fetchall())
+        changes = [{
+            'number': number,
+            'name': name,
+            'start_time': start_time,
+            'end_time': end_time,
+            'homework': homework
+        } for number, name, start_time, end_time, homework in changes]
+        return changes
+
+    async def _get_diaries(self, cursor, user_id, date: datetime.date):
+        await cursor.execute('SELECT schedule_last_cache, cache_time, jwtoken, url FROM users WHERE id=?',
+                             (user_id,))
+        last_cache, cache_time, jwtoken, url = await cursor.fetchone()
+        if time.time() - last_cache > cache_time:
+            logger.debug('время кеширования прошло, нужно получить новое')
+            return await self._update_diaries_cache(cursor, user_id, jwtoken, url, date)
+
+        await cursor.execute('SELECT number, name, start_time, end_time, homework '
+                             'FROM schedule_cache WHERE user_id=? AND date=?',
+                             (user_id, date.strftime('%d.%m.%Y')))
+        diaries = {
+            number: {
+                'number': number,
+                'name': name,
+                'homework': homework,
+                'start_time': start_time,
+                'end_time': end_time,
+            } async for number, name, start_time, end_time, homework in cursor
+        }
+
+        if not diaries:
+            return await self._update_diaries_cache(cursor, user_id, jwtoken, url, date)
+
+        return diaries
+
+    def _class_id_from_url(self, url):
+        return int(url.lower().split('departmentid')[1].split('&')[0][1:])
 
     async def _update_diaries_cache(self, cursor: aiosqlite.Cursor, user_id, jwtoken, url, date):
         elschool = ElschoolRepo()
@@ -233,18 +270,35 @@ class Repo:
             await cursor.execute('UPDATE users SET schedule_last_cache=? WHERE id=?', (time.time(), user_id))
         else:
             diaries, url = await elschool.get_diaries_and_url(jwtoken, date)
-            await cursor.execute('UPDATE users SET schedule_last_cache=?, url=? WHERE id=?',
-                                 (time.time(), url, user_id))
+            class_id = self._class_id_from_url(url)
+            await cursor.execute('UPDATE users SET schedule_last_cache=?, url=?, class_id=? WHERE id=?',
+                                 (time.time(), url, class_id, user_id))
         await cursor.execute('DELETE FROM schedule_cache WHERE user_id=?', (user_id,))
         data = []
         for day_date, day in diaries.items():
             if day is None:
                 continue
-            for (number, name), lesson in day.items():
-                data.append((user_id, day_date, number, name, lesson['start_time'], lesson['end_time'], lesson['homework']))
+            for lesson in day.values():
+                data.append((user_id, day_date, lesson['number'], lesson['name'],
+                             lesson['start_time'], lesson['end_time'], lesson['homework']))
         await cursor.executemany('INSERT INTO schedule_cache VALUES (?, ?, ?, ?, ?, ?, ?)', data)
         await self.db.commit()
         return diaries[date.strftime('%d.%m.%Y')]
+
+    async def add_changes(self, user_id, date: typing.Union[datetime.date, int], changes):
+        if isinstance(date, int):
+            await self._add_changes(user_id, date, changes)
+        else:
+            await self._add_changes(user_id, self._as_timestamp(date), changes)
+
+    async def _add_changes(self, user_id, timestamp, changes):
+        cursor = await self.db.execute('SELECT class_id FROM users WHERE id=?', (user_id,))
+        class_id, = await cursor.fetchone()
+        data = [(class_id, timestamp, number, lesson.get('name'), lesson.get('start_time'), lesson.get('end_time'),
+                 lesson.get('homework'), lesson.get('homework_next'), lesson.get('remove'))
+                for number, lesson in changes.items()]
+        await self.db.executemany('INSERT INTO schedule_changes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', data)
+        await self.db.commit()
 
 
 class RepoMiddleware(BaseMiddleware):
@@ -453,19 +507,12 @@ class ElschoolRepo:
                                                 .text.split('-'))
                         homework = (tr.find('td', class_='diary__homework')
                                     .find('div', class_='diary__homework-text').text.strip())
-                        marks = []
-                        for mark in tr.find('td', class_='diary__marks').find_all('span', class_='diary__mark'):
-                            mark_date = mark.attrs['data-popover-content'].split(':')[1]
-                            mark_value = int(mark.text.strip())
-                            marks.append({
-                                'mark': mark_value,
-                                'date': mark_date.strip()
-                            })
-                        lessons[number, name] = {
+                        lessons[number] = {
+                            'number': number,
+                            'name': name,
                             'start_time': start_time.strip(),
                             'end_time': end_time.strip(),
                             'homework': homework,
-                            'marks': marks
                         }
                     days[day] = lessons
             return days
