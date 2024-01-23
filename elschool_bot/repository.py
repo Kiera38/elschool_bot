@@ -195,7 +195,7 @@ class Repo:
 
     async def get_diaries(self, user_id, date: datetime.date):
         if date.isocalendar()[2] == 7:
-            return 'сегодня нет расписания. Тебе оно зачем понадобилось?'
+            return 'в этот день нет расписания. Тебе оно зачем понадобилось?'
         async with self.db.cursor() as cursor:
             diaries = await self._get_diaries(cursor, user_id, date)
             default_changes = await self._get_diaries_changes(cursor, user_id, date.isocalendar()[2])

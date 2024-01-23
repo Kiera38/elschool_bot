@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import ChatEvent, Dialog, Window, DialogManager
 from aiogram_dialog.widgets.text import Format, Const, List, Multi
-from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo
+from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo, Group
 
 from elschool_bot.dialogs import grades
 from elschool_bot.repository import Repo, RegisterError
@@ -106,7 +106,7 @@ async def get_schedule(manager: DialogManager, repo: Repo, date):
         return schedule
 
 
-async def on_process_result(start_data, result, manager):
+async def on_process_result(start_data, result, manager: DialogManager):
     if await grades.process_results_without_grades(start_data, result, manager):
         repo = manager.middleware_data['repo']
         date = manager.dialog_data['date']
@@ -117,6 +117,8 @@ async def on_process_result(start_data, result, manager):
                 await edit.start(schedule, weekday, manager)
             else:
                 await show_schedule(manager, schedule)
+    else:
+        await manager.switch_to(ScheduleStates.SELECT_DAY)
 
 
 async def on_edit(event, button, manager: DialogManager):
@@ -130,7 +132,7 @@ async def on_default_edit(event, select, manager: DialogManager, item):
     repo = manager.middleware_data['repo']
     today = datetime.date.today()
     today_weekday = today.isocalendar()[2]
-    date = today + datetime.timedelta(days=today_weekday-weekday)
+    date = today - datetime.timedelta(days=today_weekday - weekday)
     manager.dialog_data['default_edit'] = True
     schedule = await get_schedule(manager, repo, date)
     if schedule:
@@ -159,7 +161,7 @@ dialog = Dialog(
     Window(
         Const('выбери день'),
         RuCalendar('date_selector', on_click=on_select_day),
-        SwitchTo(Const('стандартные изменения'), 'default_edit'),
+        SwitchTo(Const('стандартные изменения'), 'default_edit', ScheduleStates.SELECT_DEFAULT_EDIT_DAY),
         state=ScheduleStates.SELECT_DAY),
     Window(Format('{status}'), state=ScheduleStates.STATUS, getter=getter),
     Window(
@@ -186,9 +188,13 @@ dialog = Dialog(
     ),
     Window(
         Const('выбери день, для которого хочешь указать изменения'),
-        Select(Format('{item}'), 'weekday_selector', lambda item: item,
-               ['понедельник', 'вторник', 'среда', 'четверг', 'пятница'],
-               on_click=on_default_edit)
+        Group(
+            Select(Format('{item}'), 'weekday_selector', lambda item: item,
+                   ['понедельник', 'вторник', 'среда', 'четверг', 'пятница'],
+                   on_click=on_default_edit),
+            width=3
+        ),
+        state=ScheduleStates.SELECT_DEFAULT_EDIT_DAY
     ),
     on_process_result=on_process_result,
     on_start=on_start

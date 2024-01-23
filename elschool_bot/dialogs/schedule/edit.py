@@ -3,7 +3,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, Window, DialogManager
 from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog.widgets.kbd import Select, Button, Column, SwitchTo, Cancel
-from aiogram_dialog.widgets.text import Const, Format
+from aiogram_dialog.widgets.text import Const, Format, List, Multi
 
 from elschool_bot.repository import Repo
 
@@ -79,22 +79,21 @@ async def on_save(event, button, manager: DialogManager):
     edits = manager.dialog_data['edits']
     repo: Repo = manager.middleware_data['repo']
     await repo.add_changes(event.from_user.id, manager.start_data[1], edits)
+    await event.message.answer('изменения сохранены')
 
 
 dialog = Dialog(
     Window(
         Const("выбери, что хочешь изменить"),
-        # Const('сейчас это будет выглядеть так:'),
-        # List(
-        #     Multi(
-        #         Format('{item[number]}. {item[name]}'),
-        #         Format('{item[start_time]} - {item[end_time]}'),
-        #         Const('домашнее задание:', when=F['item']['homework']),
-        #         Format('{item[homework]}', when=F['item']['homework']),
-        #     ),
-        #     items='start_data',
-        #     sep='\n\n'
-        # ),
+        Const('сейчас это будет выглядеть так:'),
+        List(
+            Multi(
+                Format('{item[number]}. {item[name]}'),
+                Format('{item[start_time]} - {item[end_time]}'),
+            ),
+            items=F['start_data'][0].values().cast(list),
+            sep='\n\n'
+        ),
         Column(
             Select(
                 Format("{item[number]}. {item[name]}"),
