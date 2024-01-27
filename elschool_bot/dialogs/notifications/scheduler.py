@@ -5,11 +5,10 @@ from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import TelegramObject
-from aiogram_dialog import DialogManager, Dialog, Window, BaseDialogManager, StartMode
-from aiogram_dialog.widgets.text import Format
+from aiogram_dialog import DialogManager, Dialog, BaseDialogManager, StartMode
 
-from elschool_bot.dialogs.grades import (start_get_grades, process_result, filter_selected, filter_grades,
-                                         filter_marks, show_default, show_summary, show_detail, filter_without_marks)
+from elschool_bot.dialogs.grades import start_get_grades, process_result, show_default, show_summary, show_detail, \
+    filter_marks, filter_selected, filter_without_marks
 from elschool_bot.repository import Repo
 from elschool_bot.windows import status
 
@@ -136,11 +135,11 @@ async def select_grades(grades, manager: DialogManager):
             selected = lessons.split(',')
             filters += (filter_selected(selected),)
 
-        grades = filter_grades(grades, filters, (filter_marks(marks_selected), filter_mark_date(date)))
+        value_filters = filter_marks(marks_selected), filter_mark_date(date)
         if show_mode == 0:
-            await show_default(grades, manager, False)
+            await show_default(grades, manager, filters, value_filters, False)
         else:
-            await show_detail(grades, manager, False)
+            await show_detail(grades, manager, filters, value_filters, False)
 
     if interval != -1:
         scheduler.add_grades_interval_task(manager, next_time, interval, id)

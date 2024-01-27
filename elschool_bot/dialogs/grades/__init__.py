@@ -1,5 +1,3 @@
-import datetime
-
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, DialogManager, StartMode, ShowMode
 from aiogram_dialog.widgets.kbd import Button
@@ -145,32 +143,6 @@ async def show_select(grades, manager: DialogManager):
     await manager.show(ShowMode.EDIT)
 
 
-def filter_grades(grades, filters, value_filters):
-    filters = [filt for filt in filters if filt is not None]
-    value_filters = [filt for filt in value_filters if filt is not None]
-
-    if not filters and not value_filters:
-        return grades
-
-    def default_filter(*args):
-        return True
-
-    if not filters:
-        filters = [default_filter]
-    if not value_filters:
-        value_filters = [default_filter]
-
-    filtered_grades = {}
-    for key, values in grades.items():
-        new_values = []
-        for value in values:
-            if all(filt(value) for filt in value_filters):
-                new_values.append(value)
-
-        if all(filt(key, new_values) for filt in filters):
-            filtered_grades[key] = new_values
-
-    return filtered_grades
 
 
 def filter_selected(selected):
@@ -245,26 +217,26 @@ async def on_show(query, button, manager: DialogManager):
         await show_summary(grades, manager, marks_selected)
         return
 
-    selected = set()
-    is_detail_checked = grades_select.is_detail_checked(manager)
-    if not is_detail_checked and not manager.find('select_all').is_checked():
-        selected = manager.find('select_lessons').get_checked()
-        lesson_names = list(grades)
-        selected = {lesson_names[int(i)] for i in selected}
-
     dates = manager.dialog_data.get('dates')
     lesson_dates = manager.dialog_data.get('lesson_dates')
     show_without_marks = grades_select.is_show_without_marks_checked(manager)
 
-    grades = filter_grades(grades, (filter_selected(selected), filter_without_marks(show_without_marks)),
-                           (filter_lesson_date(lesson_dates, 'lesson_date'),
-                            filter_lesson_date(dates, 'date'), filter_marks(marks_selected)))
-
-    if is_detail_checked:
-        await show_detail(grades, manager)
+    if grades_select.is_detail_checked(manager):
+        filters = filter_without_marks(show_without_marks),
+        value_filters = (filter_lesson_date(lesson_dates, 'lesson_date'),
+                         filter_lesson_date(dates, 'date'), filter_marks(marks_selected))
+        await show_detail(grades, manager, filters, value_filters)
         return
 
-    await show_default(grades, manager)
+    selected = set()
+    if not manager.find('select_all').is_checked():
+        selected = manager.find('select_lessons').get_checked()
+        lesson_names = list(grades)
+        selected = {lesson_names[int(i)] for i in selected}
+    filters = filter_selected(selected), filter_without_marks(show_without_marks)
+    value_filters = (filter_lesson_date(lesson_dates, 'lesson_date'),
+                     filter_lesson_date(dates, 'date'), filter_marks(marks_selected))
+    await show_default(grades, manager, filters, value_filters)
 
 
 async def on_start(data, manager: DialogManager):
