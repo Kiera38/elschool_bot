@@ -44,9 +44,9 @@ def filter_grades(grades, filters, value_filters):
 
 
 def mean_mark(marks):
-    if not marks:
+    values = [mark['mark'] for mark in marks if mark['mark'] != 0]
+    if not values:
         return 0
-    values = [mark['mark'] for mark in marks]
     return sum(values) / len(values)
 
 
@@ -180,10 +180,12 @@ async def show_detail(grades, manager: DialogManager, filters, value_filters, sh
         lessons[lesson] = text, mean
 
     grades = filter_grades(grades, filters, value_filters)
+    lessons_text = {}
 
     for lesson, marks in grades.items():
         text, mean = lessons[lesson]
         if not mean:
+            lessons_text[lesson] = text
             continue
         marks_count = {5: 0, 4: 0, 3: 0, 2: 0}
         marks_text = ['<u>список выбранных оценок</u>:']
@@ -200,8 +202,8 @@ async def show_detail(grades, manager: DialogManager, filters, value_filters, sh
             marks_count_text.append(f'<b>{mark}</b> - <u>{count}</u>')
 
         text += '\n'.join(marks_count_text), '\n'.join(marks_text)
-        lessons[lesson] = '\n'.join(('\n\n'.join(text), fix_text(marks, mean)))
-    await manager.start(ShowStates.SHOW_BIG, {'lessons': lessons, 'show_back': show_back})
+        lessons_text[lesson] = '\n'.join(('\n\n'.join(text), fix_text(marks, mean)))
+    await manager.start(ShowStates.SHOW_BIG, {'lessons': lessons_text, 'show_back': show_back})
 
 
 async def show_summary(grades, manager, marks_selected, show_back=True):
@@ -212,7 +214,7 @@ async def show_summary(grades, manager, marks_selected, show_back=True):
 
     less_mean = []
     greater_mean = []
-
+    print(list(itertools.chain(*grades.values())))
     mean_value = mean_mark(list(itertools.chain(*grades.values())))
     if mean_value != 0:
         text.append(f'{mean_value:.2f} - <b>средняя</b> <i>оценка</i> по <b>всем</b> предметам')
