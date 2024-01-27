@@ -43,6 +43,7 @@ async def on_input_homework(event, button, manager: DialogManager):
 async def on_no_lesson(event, button, manager: DialogManager):
     input_type, lesson_number = save_edits(manager)
     manager.dialog_data['edits'][lesson_number]['remove'] = True
+    await manager.switch_to(EditScheduleStates.SELECT_LESSON)
 
 
 async def on_add_new(event, button, manager: DialogManager):
