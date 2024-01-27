@@ -45,11 +45,16 @@ async def on_no_lesson(event, button, manager: DialogManager):
     manager.dialog_data['edits'][lesson_number]['remove'] = True
 
 
+async def on_add_new(event, button, manager: DialogManager):
+    await start_input(manager, 'номер урока с названием')
+
+
 async def on_input(event, text_input, manager: DialogManager, text):
     input_type = {
         'название': 'name',
         'время': 'time',
-        'домашнее задание': 'homework'
+        'домашнее задание': 'homework',
+        'номер урока с названием': 'number_and_name'
     }[manager.dialog_data['input_text']]
     lesson_number = save_edits(manager)
     if input_type == 'time':
@@ -60,6 +65,12 @@ async def on_input(event, text_input, manager: DialogManager, text):
         manager.start_data[0][lesson_number]['end_time'] = end_time
         manager.dialog_data['edits'][lesson_number]['start_time'] = start_time
         manager.dialog_data['edits'][lesson_number]['end_time'] = end_time
+    elif input_type == 'number_and_name':
+        number, name = text.split(' ')
+        number = number.replace('.', '').strip()
+        name = name.strip()
+        manager.start_data[0][number] = {'name': name}
+        manager.dialog_data['edits'][number] = {'name': name}
     else:
         manager.start_data[0][lesson_number][input_type] = text
         manager.dialog_data['edits'][lesson_number][input_type] = text
@@ -67,9 +78,12 @@ async def on_input(event, text_input, manager: DialogManager, text):
 
 
 def save_edits(manager):
-    lesson_number = manager.dialog_data['lesson']['number']
     if 'edits' not in manager.dialog_data:
         manager.dialog_data['edits'] = {}
+    lesson = manager.dialog_data.get('lesson')
+    if lesson is None:
+        return 0
+    lesson_number = lesson['number']
     if lesson_number not in manager.dialog_data['edits']:
         manager.dialog_data['edits'][lesson_number] = {}
     return lesson_number
@@ -104,6 +118,7 @@ dialog = Dialog(
                 on_click=on_select
             ),
         ),
+        Button(Const('добавить'), 'add_new', on_click=on_add_new),
         Button(Const('сохранить'), 'save', on_click=on_save),
         Cancel(Const('отмена')),
         state=EditScheduleStates.SELECT_LESSON

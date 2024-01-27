@@ -207,6 +207,9 @@ class Repo:
     def _apply_diaries_changes(self, changes, diaries):
         for change in changes:
             number = change['number']
+            if change['remove']:
+                del diaries[number]
+                continue
             if change['name']:
                 diaries[number]['name'] = change['name']
             if change['start_time']:
@@ -222,7 +225,7 @@ class Repo:
     async def _get_diaries_changes(self, cursor: aiosqlite.Cursor, user_id, timestamp):
         await cursor.execute('SELECT class_id FROM users WHERE id=?', (user_id,))
         class_id = (await cursor.fetchone())[0]
-        await cursor.execute('SELECT number, name, start_time, end_time, homework FROM schedule_changes '
+        await cursor.execute('SELECT number, name, start_time, end_time, homework, remove FROM schedule_changes '
                              'WHERE class_id=? AND date=?', (class_id, timestamp))
         changes = list(await cursor.fetchall())
         changes = [{
@@ -230,8 +233,9 @@ class Repo:
             'name': name,
             'start_time': start_time,
             'end_time': end_time,
-            'homework': homework
-        } for number, name, start_time, end_time, homework in changes]
+            'homework': homework,
+            'remove': remove
+        } for number, name, start_time, end_time, homework, remove in changes]
         return changes
 
     async def _get_diaries(self, cursor, user_id, date: datetime.date):

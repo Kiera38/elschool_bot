@@ -176,6 +176,7 @@ dialog = Dialog(
             sep='\n\n'
         ),
         Button(Const('изменения в расписании'), 'edit', on_click=on_edit),
+        SwitchTo(Const('другой день'), 'change_day', ScheduleStates.SELECT_DAY),
         state=ScheduleStates.SHOW
     ),
     Window(
