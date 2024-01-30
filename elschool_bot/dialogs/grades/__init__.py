@@ -7,7 +7,7 @@ from elschool_bot.dialogs import input_data
 from elschool_bot.repository import RegisterError
 from elschool_bot.widgets import grades_select
 from elschool_bot.windows import select_lessons, status
-from .show import ShowStates, show_summary, show_detail, show_default
+from .show import ShowStates, show_summary, show_detail, show_default, show_statistics
 
 
 class GradesStates(StatesGroup):
@@ -213,19 +213,15 @@ async def on_show(query, button, manager: DialogManager):
     grades = manager.dialog_data['grades']
     marks_selected = {int(mark) for mark in manager.find('marks_selector').get_checked()}
 
-    if grades_select.is_summary_checked(manager):
-        await show_summary(grades, manager, marks_selected)
-        return
-
     dates = manager.dialog_data.get('dates')
     lesson_dates = manager.dialog_data.get('lesson_dates')
     show_without_marks = grades_select.is_show_without_marks_checked(manager)
 
-    if grades_select.is_detail_checked(manager):
+    if grades_select.is_statistics_checked(manager):
         filters = filter_without_marks(show_without_marks),
         value_filters = (filter_lesson_date(lesson_dates, 'lesson_date'),
                          filter_lesson_date(dates, 'date'), filter_marks(marks_selected))
-        await show_detail(grades, manager, filters, value_filters)
+        await show_statistics(grades, manager, marks_selected, filters, value_filters)
         return
 
     selected = set()

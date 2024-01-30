@@ -27,8 +27,7 @@ class SchedulerStates(StatesGroup):
 
 class ShowModes(Enum):
     DEFAULT = 0
-    SUMMARY = 1
-    DETAIL = 2
+    STATISTICS = 1
 
 
 class Intervals(Enum):
@@ -72,10 +71,10 @@ async def select_schedule(query, manager: DialogManager, item, grades):
     manager.dialog_data['schedule_next_time'] = next_time
     show_mode = ShowModes(show_mode)
 
-    if show_mode == ShowModes.DETAIL:
-        await grades_select.set_detail_checked(manager)
-    elif show_mode == ShowModes.SUMMARY:
-        await grades_select.set_summary_checked(manager)
+    if show_mode == ShowModes.DEFAULT:
+        await manager.find('show_format').set_checked('список')
+    else:
+        await manager.find('show_format').set_checked('статистика')
 
     if lessons != 'all':
         select_lessons = manager.find('select_lessons')
@@ -147,10 +146,8 @@ async def on_save_schedule(query, button, manager: DialogManager):
     else:
         interval = -1
 
-    if grades_select.is_detail_checked(manager):
-        show_mode = ShowModes.DETAIL
-    elif grades_select.is_summary_checked(manager):
-        show_mode = ShowModes.SUMMARY
+    if grades_select.is_statistics_checked(manager):
+        show_mode = ShowModes.STATISTICS
     else:
         show_mode = ShowModes.DEFAULT
 
@@ -213,11 +210,6 @@ async def on_in_time_state_changed(event, select, manager: DialogManager, item):
 
     if 'status' in manager.dialog_data:
         del manager.dialog_data['status']
-
-
-async def on_detail_set(event, checkbox, manager: DialogManager):
-    if checkbox.is_checked():
-        await manager.find('summary').set_checked(False)
 
 
 async def on_cancel_date(query, button, manager: DialogManager):

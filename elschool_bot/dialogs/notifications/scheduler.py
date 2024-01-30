@@ -8,7 +8,7 @@ from aiogram.types import TelegramObject
 from aiogram_dialog import DialogManager, Dialog, BaseDialogManager, StartMode
 
 from elschool_bot.dialogs.grades import start_get_grades, process_result, show_default, show_summary, show_detail, \
-    filter_marks, filter_selected, filter_without_marks
+    filter_marks, filter_selected, filter_without_marks, show_statistics
 from elschool_bot.repository import Repo
 from elschool_bot.windows import status
 
@@ -126,20 +126,16 @@ async def select_grades(grades, manager: DialogManager):
     _, _, _, next_time, interval, show_mode, lessons, date, marks, show_without_marks = await repo.get_schedule(user_id, id)
 
     marks_selected = {int(mark) for mark in marks.split(',')}
-    if show_mode == 1:
-        await show_summary(grades, manager, marks_selected, False)
-        return
-    else:
-        filters = (filter_without_marks(show_without_marks),)
-        if show_mode != 0 and lessons != 'all':
-            selected = lessons.split(',')
-            filters += (filter_selected(selected),)
+    filters = (filter_without_marks(show_without_marks),)
+    if show_mode != 0 and lessons != 'all':
+        selected = lessons.split(',')
+        filters += (filter_selected(selected),)
 
-        value_filters = filter_marks(marks_selected), filter_mark_date(date)
-        if show_mode == 0:
-            await show_default(grades, manager, filters, value_filters, False)
-        else:
-            await show_detail(grades, manager, filters, value_filters, False)
+    value_filters = filter_marks(marks_selected), filter_mark_date(date)
+    if show_mode == 0:
+        await show_default(grades, manager, filters, value_filters, False)
+    else:
+        await show_statistics(grades, manager, marks_selected, filters, value_filters, False)
 
     if interval != -1:
         scheduler.add_grades_interval_task(manager, next_time, interval, id)

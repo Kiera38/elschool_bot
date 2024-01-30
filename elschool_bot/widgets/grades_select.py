@@ -9,16 +9,12 @@ def not_statistics_checked(data, widget, manager):
     return not statistics_checked(data, widget, manager)
 
 
-def not_summary_checked(data, widget, manager: DialogManager):
-    return not_statistics_checked(data, widget, manager) or not manager.find('statistics_variant').is_checked('общая')
-
-
 def statistics_checked(data, widget, manager: DialogManager):
     return manager.find('show_format').is_checked('статистика')
 
 
-def detail_checked(data, widget, manager: DialogManager):
-    return statistics_checked(data, widget, manager) and manager.find('statistics_variant').is_checked('подробная')
+def is_statistics_checked(manager: DialogManager):
+    return statistics_checked(None, None, manager)
 
 
 async def on_show_without_marks(event, checkbox, manager: DialogManager):
@@ -34,36 +30,17 @@ async def on_start(manager: DialogManager):
         await marks.set_checked(str(i), True)
 
     await manager.find('show_format').set_checked('статистика')
-    await manager.find('statistics_variant').set_checked('общая')
 
 
 def is_show_without_marks_checked(manager: DialogManager):
-    if detail_checked(None, None, manager):
-        return manager.find('show_without_marks_detail').is_checked()
+    if is_statistics_checked(manager):
+        return manager.find('show_without_marks_statistics').is_checked()
     return manager.find('show_without_marks').is_checked()
 
 
-def is_summary_checked(manager):
-    return statistics_checked(None, None, manager) and manager.find('statistics_variant').is_checked('общая')
-
-
-def is_detail_checked(manager):
-    return detail_checked(None, None, manager)
-
-
-async def set_detail_checked(manager: DialogManager):
-    await manager.find('show_format').set_checked('статистика')
-    await manager.find('statistics_variant').set_checked('подробная')
-
-
-async def set_summary_checked(manager: DialogManager):
-    await manager.find('show_format').set_checked('статистика')
-    await manager.find('statistics_variant').set_checked('общая')
-
-
 async def set_show_without_marks(manager: DialogManager):
-    if is_detail_checked(manager):
-        await manager.find('show_without_marks_detail').set_checked(True)
+    if is_statistics_checked(manager):
+        await manager.find('show_without_marks_statistics').set_checked(True)
     else:
         await manager.find('show_without_marks').set_checked(True)
 
@@ -113,7 +90,6 @@ def create(lessons_state, lesson_date_state):
                     on_start_lesson_date
                 ),
                 select_date,
-                when=not_summary_checked
             ),
         )
     else:
@@ -127,19 +103,11 @@ def create(lessons_state, lesson_date_state):
             lambda item: item,
             ['статистика', 'список']
         ),
-        Radio(
-            Format('✓ {item}'),
-            Format('{item}'),
-            'statistics_variant',
-            lambda item: item,
-            ['общая', 'подробная'],
-            when=statistics_checked
-        ),
         Checkbox(
             Const('✓ показывать без оценок'),
             Const('показывать без оценок'),
-            'show_without_marks_detail',
-            when=detail_checked,
+            'show_without_marks_statistics',
+            when=statistics_checked,
             on_state_changed=on_show_without_marks
         ),
         *center,

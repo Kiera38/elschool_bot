@@ -150,7 +150,7 @@ async def show_default(grades, manager, filters, value_filters, show_back=True):
     await manager.start(ShowStates.SHOW, {'text': text, 'show_back': show_back})
 
 
-async def show_detail(grades, manager: DialogManager, filters, value_filters, show_back=True):
+def show_detail(grades, filters, value_filters):
     lessons = {}
     mean_value = mean_mark(list(itertools.chain(*grades.values())))
 
@@ -163,9 +163,11 @@ async def show_detail(grades, manager: DialogManager, filters, value_filters, sh
         text = [f'<i>статистика</i> оценок по <b>{lesson}</b>, <u>средняя</u> {mean: .2f}']
         if mean_value != 0:
             if mean >= mean_value:
-                text.append(f'<b>эта</b> <i>средняя оценка</i> <b>больше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
+                text.append(
+                    f'<b>эта</b> <i>средняя оценка</i> <b>больше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
             else:
-                text.append(f'<b>эта</b> <i>средняя оценка</i> <b>меньше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
+                text.append(
+                    f'<b>эта</b> <i>средняя оценка</i> <b>меньше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
 
         if mean >= 4.5:
             text.append('в <b>этой части года</b> <u>должна</u> выйти 5')
@@ -203,10 +205,10 @@ async def show_detail(grades, manager: DialogManager, filters, value_filters, sh
 
         text += '\n'.join(marks_count_text), '\n'.join(marks_text)
         lessons_text[lesson] = '\n'.join(('\n\n'.join(text), fix_text(marks, mean)))
-    await manager.start(ShowStates.SHOW_BIG, {'lessons': lessons_text, 'show_back': show_back})
+    return lessons_text
 
 
-async def show_summary(grades, manager, marks_selected, show_back=True):
+def show_summary(grades, marks_selected):
     text = ['<b>статистика</b> <i>оценок</i> за <u>текущую часть года</u>:']
     lessons = {5: [], 4: [], 3: [], 2: [], 0: []}
     max_mean = ['', 0]
@@ -214,7 +216,6 @@ async def show_summary(grades, manager, marks_selected, show_back=True):
 
     less_mean = []
     greater_mean = []
-    print(list(itertools.chain(*grades.values())))
     mean_value = mean_mark(list(itertools.chain(*grades.values())))
     if mean_value != 0:
         text.append(f'{mean_value:.2f} - <b>средняя</b> <i>оценка</i> по <b>всем</b> предметам')
@@ -266,7 +267,16 @@ async def show_summary(grades, manager, marks_selected, show_back=True):
             text.append(f'<b>нет оценок</b> по предметам {lessons}')
         elif lessons:
             text.append(f'<b>{mark}</b> выходит по {lessons}')
-    await manager.start(ShowStates.SHOW_SMALL, {'grades': '\n\n'.join(text), 'show_back': show_back})
+    return '\n\n'.join(text)
+
+
+async def show_statistics(grades, manager, marks_selected, filters, value_filters, show_back=True):
+    lessons = show_detail(grades, filters, value_filters)
+    if not lessons:
+        await manager.start(ShowStates.SHOW_BIG, {'lessons': lessons, 'show_back': show_back})
+        return
+    summary = show_summary(grades, marks_selected)
+    await manager.start(ShowStates.SHOW_SMALL, {'grades': summary, 'lessons': lessons, 'show_back': show_back})
 
 
 class TextFromGetter(Text):
@@ -285,7 +295,6 @@ async def on_start(start_data, manager: DialogManager):
             manager.dialog_data['current_lesson'] = 'нет уроков'
             manager.dialog_data['current_lesson_index'] = -1
             return
-        manager.dialog_data['current_lesson'] = lessons[0]
         manager.dialog_data['current_lesson_index'] = 0
 
 
@@ -296,7 +305,8 @@ async def on_back(query, button, manager: DialogManager):
     current_lesson_index -= 1
     lessons = manager.start_data['lessons']
     if current_lesson_index < 0:
-        current_lesson_index = len(lessons) - 1
+        await manager.switch_to(ShowStates.SHOW_SMALL)
+        return
     manager.dialog_data['current_lesson'] = list(lessons)[current_lesson_index]
     manager.dialog_data['current_lesson_index'] = current_lesson_index
 
@@ -308,7 +318,8 @@ async def on_next(query, button, manager: DialogManager):
     current_lesson_index += 1
     lessons = manager.start_data['lessons']
     if current_lesson_index >= len(lessons):
-        current_lesson_index = 0
+        await manager.switch_to(ShowStates.SHOW_SMALL)
+        return
     manager.dialog_data['current_lesson'] = list(lessons)[current_lesson_index]
     manager.dialog_data['current_lesson_index'] = current_lesson_index
 
@@ -338,9 +349,28 @@ async def on_change_settings(query, button, manager: DialogManager):
     await manager.done('change_settings')
 
 
+async def on_last(event, button, manager: DialogManager):
+    lessons = list(manager.start_data['lessons'])
+    manager.dialog_data['current_lesson'] = lessons[-1]
+    manager.dialog_data['current_lesson_index'] = len(lessons) - 1
+    await manager.switch_to(ShowStates.SHOW_BIG)
+
+
+async def on_begin(event, button, manager: DialogManager):
+    lessons = list(manager.start_data['lessons'])
+    manager.dialog_data['current_lesson'] = lessons[0]
+    manager.dialog_data['current_lesson_index'] = 0
+    await manager.switch_to(ShowStates.SHOW_BIG)
+
+
 dialog = Dialog(
     Window(
         Format('{start_data[grades]}'),
+        Row(
+            Button(Const('<<'), 'back', on_last),
+            SwitchTo(Const('общая'), 'switch', ShowStates.SELECT_CURRENT_LESSON),
+            Button(Const('>>'), 'next', on_begin),
+        ),
         Button(Const('изменить настройки'), 'change_settings_small',
                on_change_settings, when=F['start_data']['show_back']),
         state=ShowStates.SHOW_SMALL
@@ -377,13 +407,15 @@ dialog = Dialog(
     ),
     Window(
         Const('выбери урок'),
+        SwitchTo(Const('общая'), 'switch_to_summary', ShowStates.SHOW_SMALL),
         Group(
             Radio(
                 Format('✓ {item[1]}'),
                 Format('{item[1]}'),
                 'select',
                 lambda item: item[0],
-                lambda data: list((i, lesson) for i, lesson in enumerate(data['start_data']['lessons'] or ['нет уроков'])),
+                lambda data: list(
+                    (i, lesson) for i, lesson in enumerate(data['start_data']['lessons'] or ['нет уроков'])),
                 on_click=on_select_current_lesson
             ),
             width=2
