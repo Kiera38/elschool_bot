@@ -1,3 +1,5 @@
+import datetime
+
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, DialogManager, StartMode, ShowMode
 from aiogram_dialog.widgets.kbd import Button
@@ -7,7 +9,7 @@ from elschool_bot.dialogs import input_data
 from elschool_bot.repository import RegisterError
 from elschool_bot.widgets import grades_select
 from elschool_bot.windows import select_lessons, status
-from .show import ShowStates, show_summary, show_detail, show_default, show_statistics
+from .show import ShowStates, show_default, show_statistics
 
 
 class GradesStates(StatesGroup):
