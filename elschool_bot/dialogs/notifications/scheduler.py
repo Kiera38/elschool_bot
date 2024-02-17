@@ -7,8 +7,8 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import TelegramObject
 from aiogram_dialog import DialogManager, Dialog, BaseDialogManager, StartMode
 
-from elschool_bot.dialogs.grades import start_get_grades, process_result, show_default, show_summary, show_detail, \
-    filter_marks, filter_selected, filter_without_marks, show_statistics
+from elschool_bot.dialogs.grades import (start_get_grades, process_result, show_default,
+                                         filter_marks, filter_selected, filter_without_marks, show_statistics)
 from elschool_bot.repository import Repo
 from elschool_bot.windows import status
 

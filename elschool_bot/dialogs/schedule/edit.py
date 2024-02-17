@@ -2,7 +2,7 @@ from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, Window, DialogManager
 from aiogram_dialog.widgets.input import TextInput
-from aiogram_dialog.widgets.kbd import Select, Button, Column, SwitchTo, Cancel
+from aiogram_dialog.widgets.kbd import Select, Button, Column, SwitchTo, Cancel, Row
 from aiogram_dialog.widgets.text import Const, Format, List, Multi
 
 from elschool_bot.repository import Repo
@@ -41,7 +41,7 @@ async def on_input_homework(event, button, manager: DialogManager):
 
 
 async def on_no_lesson(event, button, manager: DialogManager):
-    input_type, lesson_number = save_edits(manager)
+    lesson_number = save_edits(manager)
     manager.dialog_data['edits'][lesson_number]['remove'] = True
     await manager.switch_to(EditScheduleStates.SELECT_LESSON)
 
@@ -68,9 +68,11 @@ async def on_input(event, text_input, manager: DialogManager, text):
         manager.dialog_data['edits'][lesson_number]['end_time'] = end_time
     elif input_type == 'number_and_name':
         number, name = text.split(' ')
-        number = number.replace('.', '').strip()
+        number = int(number.replace('.', '').strip())
         name = name.strip()
-        manager.start_data[0][number] = {'name': name}
+        lesson = {'number': number, 'name': name, 'start_time': '', 'end_time': '', 'homework': ''}
+        manager.start_data[0][number] = lesson
+        manager.dialog_data['lesson'] = lesson
         manager.dialog_data['edits'][number] = {'name': name}
     else:
         manager.start_data[0][lesson_number][input_type] = text
@@ -94,7 +96,15 @@ async def on_save(event, button, manager: DialogManager):
     edits = manager.dialog_data['edits']
     repo: Repo = manager.middleware_data['repo']
     await repo.add_changes(event.from_user.id, manager.start_data[1], edits)
-    await event.message.answer('изменения сохранены')
+    await manager.done()
+
+
+def get_lessons(data):
+    edits = data['dialog_data']['edits']
+    lessons = [lesson for lesson in data['start_data'][0].values()
+               if not edits.get(lesson['number']) or not edits[lesson['number']].get('remove')]
+    lessons.sort(key=lambda item: item['number'])
+    return lessons
 
 
 dialog = Dialog(
@@ -105,8 +115,10 @@ dialog = Dialog(
             Multi(
                 Format('{item[number]}. {item[name]}'),
                 Format('{item[start_time]} - {item[end_time]}'),
+                Const('домашнее задание:', when=F['item']['homework']),
+                Format('{item[homework]}', when=F['item']['homework']),
             ),
-            items=F['start_data'][0].values().cast(list),
+            items=get_lessons,
             sep='\n\n'
         ),
         Column(
@@ -114,14 +126,16 @@ dialog = Dialog(
                 Format("{item[number]}. {item[name]}"),
                 'lesson',
                 lambda item: item['number'],
-                lambda data: list(data['start_data'][0].values()),
+                get_lessons,
                 int,
                 on_click=on_select
             ),
         ),
         Button(Const('добавить'), 'add_new', on_click=on_add_new),
-        Button(Const('сохранить'), 'save', on_click=on_save),
-        Cancel(Const('отмена')),
+        Row(
+            Button(Const('сохранить'), 'save', on_click=on_save),
+            Cancel(Const('отмена')),
+        ),
         state=EditScheduleStates.SELECT_LESSON
     ),
     Window(

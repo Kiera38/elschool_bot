@@ -4,13 +4,14 @@ from aiogram import F, Router
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import ChatEvent, Dialog, Window, DialogManager
 from aiogram_dialog.widgets.text import Format, Const, List, Multi
-from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo, Group
+from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo, Group, Checkbox, Row
 
 from elschool_bot.dialogs import grades
 from elschool_bot.repository import Repo, RegisterError
 from elschool_bot.widgets.ru_calendar import RuCalendar
 from elschool_bot.windows import status
 from . import edit
+from ..grades.show import fix_text, mean_mark
 
 
 class ScheduleStates(StatesGroup):
@@ -44,8 +45,15 @@ def as_datetime(time):
             .replace(hour=int(hour), minute=int(minute), second=0, microsecond=0))
 
 
+def save_lessons(schedule, manager: DialogManager):
+    lessons = list(schedule.values())
+    lessons.sort(key=lambda item: item['number'])
+    manager.dialog_data['lessons'] = lessons
+    return lessons
+
+
 async def show_schedule(manager: DialogManager, schedule):
-    lessons = manager.dialog_data['lessons'] = list(schedule.values())
+    lessons = save_lessons(schedule, manager)
     manager.dialog_data['schedule'] = schedule
     if manager.dialog_data.get('time'):
         now = datetime.datetime.utcnow() + datetime.timedelta(hours=5)
@@ -110,18 +118,26 @@ async def on_process_result(start_data, result, manager: DialogManager):
     if await grades.process_results_without_grades(start_data, result, manager):
         repo = manager.middleware_data['repo']
         date = manager.dialog_data['date']
+        if manager.dialog_data.get('marks'):
+            marks = await get_marks_after_error(manager, repo, manager.event.from_user.id)
+            if marks:
+                await show_marks(marks, manager)
+            return
         schedule = await get_schedule_after_error(manager, repo, date)
         if schedule:
-            if manager.dialog_data['default_edit']:
+            if manager.dialog_data.get('default_edit'):
                 weekday = date.isocalendar()[2]
                 await edit.start(schedule, weekday, manager)
             else:
                 await show_schedule(manager, schedule)
-    else:
+    elif manager.dialog_data.get('default_edit'):
         await manager.switch_to(ScheduleStates.SELECT_DAY)
+    else:
+        save_lessons(manager.dialog_data['schedule'], manager)
 
 
 async def on_edit(event, button, manager: DialogManager):
+    manager.dialog_data['has_marks'] = False
     await edit.start(manager.dialog_data['schedule'], manager.dialog_data['date'], manager)
 
 
@@ -157,6 +173,57 @@ async def on_start(data, manager: DialogManager):
             await show_schedule(manager, schedule)
 
 
+async def get_marks(manager, repo, user_id):
+    try:
+        marks = await repo.get_grades(user_id)
+    except RegisterError as e:
+        status.set(manager, 'получение оценок')
+        if await grades.handle_register_error(manager, repo, e):
+            return await get_marks_after_error(manager, repo, user_id)
+    else:
+        return marks
+
+
+async def get_marks_after_error(manager, repo, user_id):
+    try:
+        marks = await repo.get_grades(user_id)
+    except RegisterError as e:
+        status_text = manager.dialog_data['status']
+        message = e.args[0]
+        await status.update(manager, f'{status_text}\n{message}')
+    else:
+        return marks
+
+
+async def on_marks(event, checkbox, manager: DialogManager):
+    if checkbox.is_checked() and not manager.dialog_data.get('has_marks'):
+        repo: Repo = manager.middleware_data['repo']
+        await manager.switch_to(ScheduleStates.STATUS)
+        status.set(manager, 'получение оценок', marks=True)
+        grades = await get_marks(manager, repo, event.from_user.id)
+        if grades:
+            await show_marks(grades, manager)
+
+
+async def show_marks(grades, manager):
+    del manager.dialog_data['marks']
+    for lesson in manager.dialog_data['lessons']:
+        marks = grades[lesson['name']]
+        mean = mean_mark(marks)
+        if mean == 0:
+            lesson['marks'] = 'нет'
+            lesson['fix'] = ''
+        else:
+            lesson['marks'] = ', '.join(str(mark['mark']) for mark in marks)
+            lesson['fix'] = fix_text(marks, mean)
+    manager.dialog_data['has_marks'] = True
+    await manager.switch_to(ScheduleStates.SHOW)
+
+
+def need_marks(data, widget, manager: DialogManager):
+    return manager.find('marks').is_checked()
+
+
 dialog = Dialog(
     Window(
         Const('выбери день'),
@@ -171,12 +238,16 @@ dialog = Dialog(
                 Format('{item[start_time]} - {item[end_time]}'),
                 Const('домашнее задание:', when=F['item']['homework']),
                 Format('{item[homework]}', when=F['item']['homework']),
+                Format('оценки {item[marks]}{item[fix]}', when=need_marks),
             ),
             items=F['dialog_data']['lessons'],
             sep='\n\n'
         ),
         Button(Const('изменения в расписании'), 'edit', on_click=on_edit),
-        SwitchTo(Const('другой день'), 'change_day', ScheduleStates.SELECT_DAY),
+        Row(
+            Checkbox(Const('✓ оценки'), Const('оценки'), 'marks', on_state_changed=on_marks),
+            SwitchTo(Const('другой день'), 'change_day', ScheduleStates.SELECT_DAY),
+        ),
         state=ScheduleStates.SHOW
     ),
     Window(

@@ -210,6 +210,8 @@ class Repo:
             if change['remove']:
                 del diaries[number]
                 continue
+            if number not in diaries:
+                diaries[number] = {'number': number, 'name': '', 'start_time': '', 'end_time': '', 'homework': ''}
             if change['name']:
                 diaries[number]['name'] = change['name']
             if change['start_time']:
