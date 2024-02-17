@@ -16,7 +16,7 @@ async def on_selected_lessons_changed(event, select, manager: DialogManager, ite
 
 
 async def on_show_without_marks(event, checkbox, manager: DialogManager):
-    show_without_marks = manager.find('show_without_marks_detail')
+    show_without_marks = manager.find('show_without_marks_statistics')
     is_checked = checkbox.is_checked()
     if is_checked != show_without_marks.is_checked():
         await show_without_marks.set_checked(is_checked)

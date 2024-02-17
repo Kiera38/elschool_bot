@@ -17,7 +17,7 @@ main_menu = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='расписание'), KeyboardButton(text='расписание звонков')],
     [KeyboardButton(text='записать домашку')],
     [KeyboardButton(text='оценки'), KeyboardButton(text='итоговые оценки')],
-    [KeyboardButton(text='отправка по времени'), KeyboardButton(text='настройки')]
+    [KeyboardButton(text='уведомления'), KeyboardButton(text='настройки')]
 ], resize_keyboard=True)
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,8 @@ async def start_command(message: Message):
     logger.info(f'пользователь с id {message.from_user.id} использовал команду /start')
     await message.answer('Привет, я Elschool Bot. Буду помогать тебе с учёбой. '
                          'Для начала рекомендую зарегистрироваться или почитать помощь, '
-                         'чтобы разобраться с моими возможностями.',
+                         'чтобы разобраться с моими возможностями. Также советую подписаться на канал @elschoolbotnews.'
+                         'Там публикуется важная информация.',
                          reply_markup=main_menu)
 
 
@@ -56,8 +57,8 @@ async def show_menu(message: Message):
     await message.answer('основное меню', reply_markup=main_menu)
 
 
-@router.message(Command('schedules'))
-@router.message(F.text == 'отправка по времени')
+@router.message(Command('notifications'))
+@router.message(F.text == 'уведомления')
 async def schedules(message: Message, dialog_manager, repo):
     if not await repo.has_user(message.from_user.id):
         logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
@@ -65,7 +66,7 @@ async def schedules(message: Message, dialog_manager, repo):
         await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
                              'Это можно сделать на вкладке настройки.')
         return
-    logger.debug(f'пользователь с id {message.from_user.id} решил по управлять своими отправками по времени')
+    logger.debug(f'пользователь с id {message.from_user.id} решил посмотреть настройки уведомлений')
     await notifications.show(dialog_manager)
 
 
@@ -175,9 +176,10 @@ async def set_commands(bot: Bot):
         BotCommand(command='/showmenu', description='показать меню'),
         BotCommand(command='/settings', description='показать настройки'),
         BotCommand(command='/grades', description='показать оценки'),
-        BotCommand(command='/schedules', description='показать отправки'),
+        BotCommand(command='/notifications', description='показать настройки уведомлений'),
         BotCommand(command='/resultsgrades', description='показать итоговые оценки'),
         BotCommand(command='/schedule', description='показать расписание'),
+        BotCommand(command='/timeschedule', description='показать расписание звонков'),
         BotCommand(command='/inputhomework', description='записать домашку')
     ]
     await bot.set_my_commands(commands)
