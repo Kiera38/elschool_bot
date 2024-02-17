@@ -15,6 +15,7 @@ from .notifications.scheduler import Scheduler, SchedulerMiddleware
 router = Router()
 main_menu = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='расписание'), KeyboardButton(text='расписание звонков')],
+    [KeyboardButton(text='записать домашку')],
     [KeyboardButton(text='оценки'), KeyboardButton(text='итоговые оценки')],
     [KeyboardButton(text='отправка по времени'), KeyboardButton(text='настройки')]
 ], resize_keyboard=True)
@@ -91,6 +92,12 @@ async def show_schedule(message, dialog_manager):
 @router.message(F.text == 'расписание звонков')
 async def show_time_schedule(message, dialog_manager):
     await schedule.start_time_schedule(dialog_manager)
+
+
+@router.message(Command('inputhomework'))
+@router.message(F.text == 'записать домашку')
+async def input_homework(message, dialog_manager):
+    await schedule.start_input_homework(dialog_manager)
 
 
 @router.message(Command('restoreschedules'))
@@ -170,6 +177,7 @@ async def set_commands(bot: Bot):
         BotCommand(command='/grades', description='показать оценки'),
         BotCommand(command='/schedules', description='показать отправки'),
         BotCommand(command='/resultsgrades', description='показать итоговые оценки'),
-        BotCommand(command='/schedule', description='показать расписание')
+        BotCommand(command='/schedule', description='показать расписание'),
+        BotCommand(command='/inputhomework', description='записать домашку')
     ]
     await bot.set_my_commands(commands)

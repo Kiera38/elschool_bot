@@ -136,7 +136,7 @@ class Repo:
             ids = {id[0] async for id in cursor}
             max_id = max(ids) if ids else 0
             id = 1
-            for id in range(1, max_id+2):
+            for id in range(1, max_id + 2):
                 if id not in ids:
                     break
             if not name or name == 'None':
@@ -297,6 +297,10 @@ class Repo:
         else:
             await self._add_changes(user_id, self._as_timestamp(date), changes)
 
+        day = datetime.date.today() - datetime.timedelta(days=1)
+        await self.db.execute('DELETE FROM schedule_changes WHERE timestamp<?', (self._as_timestamp(day),))
+        await self.db.commit()
+
     async def _add_changes(self, user_id, timestamp, changes):
         cursor = await self.db.execute('SELECT class_id FROM users WHERE id=?', (user_id,))
         class_id, = await cursor.fetchone()
@@ -304,7 +308,19 @@ class Repo:
                  lesson.get('homework'), lesson.get('homework_next'), lesson.get('remove'))
                 for number, lesson in changes.items()]
         await self.db.executemany('INSERT INTO schedule_changes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', data)
-        await self.db.commit()
+
+    async def save_homework(self, user_id, lesson, homework):
+        day = datetime.date.today() + datetime.timedelta(days=1)
+        for i in range(30):
+            diaries = await self.get_diaries(user_id, day)
+            if isinstance(diaries, str):
+                continue
+            for day_lesson in diaries.values():
+                if day_lesson['name'] == lesson:
+                    await self.add_changes(user_id, day,
+                                           {day_lesson['number']: {'homework': homework, 'homework_next': True}})
+                    return day
+            day += datetime.timedelta(days=1)
 
 
 class RepoMiddleware(BaseMiddleware):
@@ -494,7 +510,7 @@ class ElschoolRepo:
                 for tbody in table.find_all('tbody'):
                     trs = tbody.find_all('tr', class_='diary__lesson')
                     if not trs:
-                         continue
+                        continue
                     day = trs[0].find('td', class_='diary__dayweek').text.strip()
                     if '\xa0' in day:
                         day = day.split('\xa0', 1)[1].strip()

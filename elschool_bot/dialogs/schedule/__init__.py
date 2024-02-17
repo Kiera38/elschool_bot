@@ -3,6 +3,7 @@ import datetime
 from aiogram import F, Router
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import ChatEvent, Dialog, Window, DialogManager
+from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog.widgets.text import Format, Const, List, Multi
 from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo, Group, Checkbox, Row
 
@@ -20,6 +21,8 @@ class ScheduleStates(StatesGroup):
     SHOW = State()
     SHOW_TIME_SCHEDULE = State()
     SELECT_DEFAULT_EDIT_DAY = State()
+    SELECT_LESSON_HOMEWORK = State()
+    INPUT_LESSON_HOMEWORK = State()
 
 
 async def start(manager: DialogManager):
@@ -28,6 +31,10 @@ async def start(manager: DialogManager):
 
 async def start_time_schedule(manager: DialogManager):
     await manager.start(ScheduleStates.STATUS, 'time')
+
+
+async def start_input_homework(manager: DialogManager):
+    await manager.start(ScheduleStates.STATUS, 'homework')
 
 
 async def on_select_day(event: ChatEvent, widget: ManagedCalendar, manager: DialogManager, date):
@@ -81,6 +88,8 @@ async def show_schedule(manager: DialogManager, schedule):
                                'Когда она произошла? Это будет полезная информация для разработчика.')
         manager.dialog_data['current'] = current
         await manager.switch_to(ScheduleStates.SHOW_TIME_SCHEDULE)
+    elif manager.dialog_data.get('homework'):
+        await manager.switch_to(ScheduleStates.SELECT_LESSON_HOMEWORK)
     else:
         await manager.switch_to(ScheduleStates.SHOW)
 
@@ -163,8 +172,8 @@ async def getter(dialog_manager, **kwargs):
 
 
 async def on_start(data, manager: DialogManager):
-    if data == 'time':
-        manager.dialog_data['time'] = True
+    if data in ('time', 'homework'):
+        manager.dialog_data[data] = True
         repo: Repo = manager.middleware_data['repo']
         date = datetime.date.today()
         await manager.switch_to(ScheduleStates.STATUS)
@@ -224,6 +233,23 @@ def need_marks(data, widget, manager: DialogManager):
     return manager.find('marks').is_checked()
 
 
+async def on_select_homework_lesson(event, select, manager: DialogManager, item):
+    manager.dialog_data['selected_lesson'] = manager.dialog_data['schedule'][int(item)]['name']
+    await manager.switch_to(ScheduleStates.INPUT_LESSON_HOMEWORK)
+
+
+async def on_input_homework(event, text_input, manager: DialogManager, text):
+    repo: Repo = manager.middleware_data['repo']
+    lesson = manager.dialog_data['selected_lesson']
+    day = await repo.save_homework(event.from_user.id, lesson, text)
+    if day:
+        manager.dialog_data['status'] = f'домашнее задание сохранено на {day: %d.%m.%Y}'
+    else:
+        manager.dialog_data['status'] = (f'не найден день, когда урок {lesson} будет в следующий раз. '
+                                         f'Можешь попробовать сам найти')
+    await manager.switch_to(ScheduleStates.STATUS)
+
+
 dialog = Dialog(
     Window(
         Const('выбери день'),
@@ -267,6 +293,22 @@ dialog = Dialog(
             width=3
         ),
         state=ScheduleStates.SELECT_DEFAULT_EDIT_DAY
+    ),
+    Window(
+        Const('выбери урок, для которого хочешь записать домашнее задание'),
+        Select(
+            Format('{item[number]}. {item[name]}'),
+            'homework_lessons',
+            lambda item: item['number'],
+            F['dialog_data']['lessons'],
+            on_click=on_select_homework_lesson
+        ),
+        state=ScheduleStates.SELECT_LESSON_HOMEWORK
+    ),
+    Window(
+        Format('введи домашку для урока {dialog_data[selected_lesson]}'),
+        TextInput('input_homework', on_success=on_input_homework),
+        state=ScheduleStates.INPUT_LESSON_HOMEWORK
     ),
     on_process_result=on_process_result,
     on_start=on_start
