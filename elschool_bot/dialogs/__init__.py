@@ -8,16 +8,16 @@ from aiogram_dialog import DialogManager, StartMode, setup_dialogs
 from aiogram_dialog.api.entities import DIALOG_EVENT_NAME
 
 from elschool_bot.repository import RepoMiddleware, Repo, DataProcessError, RegisterError
-from . import settings, grades, input_data, notifications, date_selector, results_grades, schedule
+from . import settings, grades, input_data, notifications, date_selector, results_grades, schedule, help
 from .grades import start_select_grades
 from .notifications.scheduler import Scheduler, SchedulerMiddleware
 
 router = Router()
 main_menu = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='расписание'), KeyboardButton(text='расписание звонков')],
-    [KeyboardButton(text='записать домашку')],
-    [KeyboardButton(text='оценки'), KeyboardButton(text='итоговые оценки')],
-    [KeyboardButton(text='уведомления'), KeyboardButton(text='настройки')]
+    [KeyboardButton(text='расписание'), KeyboardButton(text='оценки')],
+    [KeyboardButton(text='расписание звонков'), KeyboardButton(text='записать домашку')],
+    [KeyboardButton(text='итоговые оценки'), KeyboardButton(text='уведомления')],
+    [KeyboardButton(text='настройки'), KeyboardButton(text='помощь')]
 ], resize_keyboard=True)
 logger = logging.getLogger(__name__)
 
@@ -101,6 +101,12 @@ async def input_homework(message, dialog_manager):
     await schedule.start_input_homework(dialog_manager)
 
 
+@router.message(Command('help'))
+@router.message(F.text == 'помощь')
+async def start_help(message, dialog_manager):
+    await dialog_manager.start(help.HelpStates.MAIN)
+
+
 @router.message(Command('restoreschedules'))
 async def restore_schedules(message: Message, dialog_manager: DialogManager, notifications):
     logger.info(f'разработчик с id {message.from_user.id} решил восстановить отправки по времени')
@@ -168,11 +174,13 @@ def register_handlers(dp: Dispatcher, config):
     dp.include_router(input_data.dialog)
     dp.include_router(date_selector.dialog)
     dp.include_router(results_grades.dialog)
+    dp.include_router(help.dialog)
 
 
 async def set_commands(bot: Bot):
     commands = [
         BotCommand(command='/start', description='запустить бота'),
+        BotCommand(command='/help', description='помощь, описание всех возможностей'),
         BotCommand(command='/showmenu', description='показать меню'),
         BotCommand(command='/settings', description='показать настройки'),
         BotCommand(command='/grades', description='показать оценки'),
