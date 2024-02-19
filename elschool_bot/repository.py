@@ -298,7 +298,7 @@ class Repo:
             await self._add_changes(user_id, self._as_timestamp(date), changes)
 
         day = datetime.date.today() - datetime.timedelta(days=1)
-        await self.db.execute('DELETE FROM schedule_changes WHERE timestamp<?', (self._as_timestamp(day),))
+        await self.db.execute('DELETE FROM schedule_changes WHERE date<?', (self._as_timestamp(day),))
         await self.db.commit()
 
     async def _add_changes(self, user_id, timestamp, changes):
@@ -317,6 +317,8 @@ class Repo:
                 continue
             for day_lesson in diaries.values():
                 if day_lesson['name'] == lesson:
+                    if day_lesson['homework']:
+                        homework = '\n'.join((day_lesson['homework'], homework))
                     await self.add_changes(user_id, day,
                                            {day_lesson['number']: {'homework': homework, 'homework_next': True}})
                     return day

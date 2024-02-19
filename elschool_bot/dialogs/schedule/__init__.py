@@ -5,7 +5,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import ChatEvent, Dialog, Window, DialogManager
 from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog.widgets.text import Format, Const, List, Multi
-from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo, Group, Checkbox, Row
+from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo, Group, Checkbox, Row, Column
 
 from elschool_bot.dialogs import grades
 from elschool_bot.repository import Repo, RegisterError
@@ -296,12 +296,14 @@ dialog = Dialog(
     ),
     Window(
         Const('выбери урок, для которого хочешь записать домашнее задание'),
-        Select(
-            Format('{item[number]}. {item[name]}'),
-            'homework_lessons',
-            lambda item: item['number'],
-            F['dialog_data']['lessons'],
-            on_click=on_select_homework_lesson
+        Column(
+            Select(
+                Format('{item[number]}. {item[name]}'),
+                'homework_lessons',
+                lambda item: item['number'],
+                F['dialog_data']['lessons'],
+                on_click=on_select_homework_lesson
+            ),
         ),
         state=ScheduleStates.SELECT_LESSON_HOMEWORK
     ),
