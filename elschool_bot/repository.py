@@ -179,6 +179,12 @@ class Repo:
             if user_id not in schedules:
                 schedules[user_id] = []
             schedules[user_id].append({'id': id, 'next_time': next_time})
+
+        cursor = await self.db.execute('SELECT id, autosend_schedule_time WHERE autosend_schedule_time!=NULL')
+        async for user_id, time in cursor:
+            if user_id not in schedules:
+                schedules[user_id] = []
+            schedules[user_id].append({'id': -1, 'next_time': time})
         return schedules
 
     async def get_results(self, user_id):
@@ -323,6 +329,34 @@ class Repo:
                                            {day_lesson['number']: {'homework': homework, 'homework_next': True}})
                     return day
             day += datetime.timedelta(days=1)
+
+    async def get_user_autosend_schedule(self, user_id):
+        cursor = await self.db.execute(
+            'SELECT autosend_schedule_time, autosend_schedule_interval FROM users WHERE id=?',
+            (user_id,))
+        return await cursor.fetchone()
+
+    async def set_user_autosend_schedule(self, user_id, time, interval):
+        await self.db.execute('UPDATE users SET autosend_schedule_time=?, autosend_schedule_interval=? WHERE id=?',
+                              (time, interval, user_id))
+        await self.db.commit()
+
+    async def get_user_notify_change_schedule(self, user_id):
+        cursor = await self.db.execute('SELECT notify_change_schedule FROM users WHERE id=?',
+                                       (user_id,))
+        return (await cursor.fetchone())[0]
+
+    async def set_user_notify_change_schedule(self, user_id, notify_change_schedule):
+        await self.db.execute('UPDATE users SET notify_change_schedule=? WHERE id=?',
+                              (notify_change_schedule, user_id))
+        await self.db.commit()
+
+    async def get_class_users_notify_change_schedule(self, user_id):
+        cursor = await self.db.execute('SELECT id FROM users WHERE class_id=('
+                                       'SELECT class_id FROM users WHERE id=:id)'
+                                       'AND notify_change_schedule',
+                                       {'id': user_id})
+        return [i[0] async for i in cursor]
 
 
 class RepoMiddleware(BaseMiddleware):

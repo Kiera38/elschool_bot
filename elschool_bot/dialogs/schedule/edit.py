@@ -81,8 +81,6 @@ async def on_input(event, text_input, manager: DialogManager, text):
 
 
 def save_edits(manager):
-    if 'edits' not in manager.dialog_data:
-        manager.dialog_data['edits'] = {}
     lesson = manager.dialog_data.get('lesson')
     if lesson is None:
         return 0
@@ -105,6 +103,10 @@ def get_lessons(data):
                if not edits.get(lesson['number']) or not edits[lesson['number']].get('remove')]
     lessons.sort(key=lambda item: item['number'])
     return lessons
+
+
+async def on_start(data, manager: DialogManager):
+    manager.dialog_data['edits'] = {}
 
 
 dialog = Dialog(
@@ -134,7 +136,7 @@ dialog = Dialog(
         Button(Const('добавить'), 'add_new', on_click=on_add_new),
         Row(
             Button(Const('сохранить'), 'save', on_click=on_save),
-            Cancel(Const('отмена')),
+            Cancel(Const('отмена'), result='cancel'),
         ),
         state=EditScheduleStates.SELECT_LESSON
     ),
@@ -156,5 +158,6 @@ dialog = Dialog(
         Format('Введи новое {dialog_data[input_text]}'),
         TextInput('input_text', on_success=on_input),
         state=EditScheduleStates.INPUT_TEXT
-    )
+    ),
+    on_start=on_start
 )

@@ -2,7 +2,7 @@ import datetime
 
 from aiogram import F, Router
 from aiogram.fsm.state import StatesGroup, State
-from aiogram_dialog import ChatEvent, Dialog, Window, DialogManager
+from aiogram_dialog import ChatEvent, Dialog, Window, DialogManager, BaseDialogManager, StartMode
 from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog.widgets.text import Format, Const, List, Multi
 from aiogram_dialog.widgets.kbd import ManagedCalendar, Button, Select, SwitchTo, Group, Checkbox, Row, Column
@@ -37,6 +37,14 @@ async def start_input_homework(manager: DialogManager):
     await manager.start(ScheduleStates.STATUS, 'homework')
 
 
+async def start_date(manager: DialogManager, date):
+    await manager.start(ScheduleStates.STATUS, {'type': 'date', 'date': date})
+
+
+async def start_schedule(manager: BaseDialogManager, schedule):
+    await manager.start(ScheduleStates.STATUS, {'type': 'schedule', 'schedule': schedule}, mode=StartMode.NEW_STACK)
+
+
 async def on_select_day(event: ChatEvent, widget: ManagedCalendar, manager: DialogManager, date):
     repo: Repo = manager.middleware_data['repo']
     await manager.switch_to(ScheduleStates.STATUS)
@@ -56,12 +64,12 @@ def save_lessons(schedule, manager: DialogManager):
     lessons = list(schedule.values())
     lessons.sort(key=lambda item: item['number'])
     manager.dialog_data['lessons'] = lessons
+    manager.dialog_data['schedule'] = schedule
     return lessons
 
 
 async def show_schedule(manager: DialogManager, schedule):
     lessons = save_lessons(schedule, manager)
-    manager.dialog_data['schedule'] = schedule
     if manager.dialog_data.get('time'):
         now = datetime.datetime.utcnow() + datetime.timedelta(hours=5)
         end_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -141,13 +149,19 @@ async def on_process_result(start_data, result, manager: DialogManager):
                 await show_schedule(manager, schedule)
     elif manager.dialog_data.get('default_edit'):
         await manager.switch_to(ScheduleStates.SELECT_DAY)
-    else:
-        save_lessons(manager.dialog_data['schedule'], manager)
+    elif result != 'cancel':
+        save_lessons(result, manager)
+        user_id = manager.event.from_user.id
+        repo = manager.middleware_data['repo']
+        class_users = await repo.get_class_users_notify_change_schedule(user_id)
+        schedule = manager.dialog_data['schedule']
+        for user in class_users:
+            await start_schedule(manager.bg(user, user, ''), schedule)
 
 
 async def on_edit(event, button, manager: DialogManager):
     manager.dialog_data['has_marks'] = False
-    await edit.start(manager.dialog_data['schedule'], manager.dialog_data['date'], manager)
+    await edit.start(manager.dialog_data['schedule'].copy(), manager.dialog_data['date'], manager)
 
 
 async def on_default_edit(event, select, manager: DialogManager, item):
@@ -172,6 +186,18 @@ async def getter(dialog_manager, **kwargs):
 
 
 async def on_start(data, manager: DialogManager):
+    if isinstance(data, dict):
+        if data['type'] == 'date':
+            manager.dialog_data['date'] = True
+            repo: Repo = manager.middleware_data['repo']
+            date = data['date']
+            await manager.switch_to(ScheduleStates.STATUS)
+            schedule = await get_schedule(manager, repo, date)
+            if schedule:
+                await show_schedule(manager, schedule)
+        elif data['type'] == 'schedule':
+            await show_schedule(manager, data['schedule'])
+
     if data in ('time', 'homework'):
         manager.dialog_data[data] = True
         repo: Repo = manager.middleware_data['repo']

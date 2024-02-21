@@ -64,7 +64,7 @@ async def select_schedule(query, manager: DialogManager, item, grades):
     item = int(item)
     repo: Repo = manager.middleware_data['repo']
     scheduler = manager.middleware_data['notifications']
-    scheduler.remove_grades_task(query.from_user.id, item)
+    scheduler.remove_id_task(query.from_user.id, item)
     _, _, name, next_time, interval, show_mode, lessons, dates, marks, show_without_marks = await repo.get_schedule(
         query.from_user.id, item)
     manager.dialog_data['schedule_next_time'] = next_time
@@ -174,7 +174,7 @@ async def on_save_schedule(query, button, manager: DialogManager):
         await repo.update_schedule(user_id, id, name, next_time, interval,
                                    show_mode.value, lessons, dates, marks, show_without_marks)
     scheduler = manager.middleware_data['notifications']
-    scheduler.add_grades_task(manager, next_time, id)
+    scheduler.add_id_task(manager, next_time, id)
     status.set(manager, 'отправка сохранена')
     await manager.switch_to(SchedulerStates.STATUS)
 
@@ -183,7 +183,7 @@ async def on_delete(query, button, manager: DialogManager):
     repo: Repo = manager.middleware_data['repo']
     await repo.remove_schedule(query.from_user.id, manager.dialog_data['schedule_id'])
     scheduler = manager.middleware_data['notifications']
-    scheduler.remove_grades_task(query.from_user.id, manager.dialog_data['schedule_id'])
+    scheduler.remove_id_task(query.from_user.id, manager.dialog_data['schedule_id'])
     manager.start_data[:] = await repo.schedule_names(query.from_user.id)
     await manager.switch_to(SchedulerStates.SCHEDULES_LIST)
 

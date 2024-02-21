@@ -1,13 +1,18 @@
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, Window, DialogManager
-from aiogram_dialog.widgets.kbd import Button, Checkbox, Radio, Group
+from aiogram_dialog.widgets.input import TextInput
+from aiogram_dialog.widgets.kbd import Button, Checkbox, Radio, Group, SwitchTo
 from aiogram_dialog.widgets.text import Const, Format
 
 from elschool_bot.dialogs.notifications import scheduler, autosending
+from elschool_bot.repository import Repo
 
 
 class NotificationStates(StatesGroup):
     MAIN = State()
+    SELECT_TIME_SCHEDULE = State()
+    INPUT_CUSTOM_TIME = State()
+    STATUS = State()
 
 
 async def show(manager: DialogManager):
@@ -18,37 +23,64 @@ async def on_autosend_grades(event, button, manager: DialogManager):
     await autosending.show(manager)
 
 
+async def on_autosend_schedule(event, button, manager: DialogManager):
+    repo: Repo = manager.middleware_data['repo']
+    time, interval = await repo.get_user_autosend_schedule(event.from_user.id)
+    autosend_schedule = manager.find('autosend_schedule')
+    in_time = manager.find('in_time')
+    loop = manager.find('loop')
+    if time:
+        await autosend_schedule.set_checked(True)
+        if time in ('12:00', '15:00', '18:00'):
+            await in_time.set_checked(time.replace(':', '_'))
+        else:
+            await in_time.set_checked('other')
+            manager.dialog_data['autosend_schedule_time'] = time
+
+        if interval != -1:
+            await loop.set_checked(True)
+            await manager.find('interval').set_checked(interval)
+        else:
+            await loop.set_checked(False)
+    else:
+        await autosend_schedule.set_checked(False)
+        await loop.set_checked(False)
+
+    await manager.switch_to(NotificationStates.SELECT_TIME_SCHEDULE)
+
+
+async def on_save_autosend_schedule(event, button, manager: DialogManager):
+    autosend_schedule = manager.find('autosend_schedule')
+    in_time = manager.find('in_time')
+    loop = manager.find('loop')
+    time = None
+    interval = -1
+
+    if autosend_schedule.is_checked():
+        time = in_time.get_checked()
+        if time == 'other':
+            time = manager.dialog_data['autosend_schedule_time']
+        else:
+            time = time.replace('_', ':')
+
+        if loop.is_checked():
+            interval = manager.find('interval').get_checked()
+
+    repo = manager.middleware_data['repo']
+    await repo.set_user_autosend_schedule(event.from_user.id, time, interval)
+    await manager.switch_to(NotificationStates.STATUS)
+
+
+async def on_input_custom_time(event, text_input, manager: DialogManager, text):
+    manager.dialog_data['autosend_schedule_time'] = text
+    await manager.switch_to(NotificationStates.SELECT_TIME_SCHEDULE)
+
+
 dialog = Dialog(
     Window(
         Const('настройка уведомлений'),
         Button(Const('автоматическая отправка оценок'), 'autosend_grades', on_autosend_grades),
-        Checkbox(
-            Const('✓ отправлять расписание'),
-            Const('отправлять расписание'),
-            'autosend_schedule'
-        ),
-        Radio(
-            Format('✓ {item}'),
-            Format('{item}'),
-            'in_time',
-            lambda item: item.replace(':', '_').replace('другое', 'other'),
-            ['12:00', '15:00', '18:00', 'другое'],
-            when=lambda data, radio, manager: manager.find('autosend_schedule').is_checked()
-        ),
-        Checkbox(Const('✓ повторять'), Const('повторять'), 'loop',
-                 when=lambda data, radio, manager: manager.find('autosend_schedule').is_checked()),
-        Group(
-            Radio(
-                Format('✓ {item[1]}'),
-                Format('{item[1]}'),
-                'interval',
-                lambda item: item[0],
-                [(0, 'каждый день'), (1, 'раз в неделю'), (2, 'раз в месяц')],
-                when=lambda data, radio, manager: (manager.find('loop').is_checked() and
-                                                   manager.find('autosend_schedule').is_checked())
-            ),
-            width=2
-        ),
+        Button(Const('автоматическая отправка расписания'), 'autosend_schedule_btn', on_autosend_schedule),
         Checkbox(
             Const('✓ отправлять расписание при изменениях'),
             Const('отправлять расписание при изменениях'),
@@ -76,6 +108,48 @@ dialog = Dialog(
         ),
         state=NotificationStates.MAIN
     ),
+    Window(
+        Const('выбери, когда показывать расписание'),
+        Checkbox(
+            Const('✓ отправлять расписание'),
+            Const('отправлять расписание'),
+            'autosend_schedule'
+        ),
+        Radio(
+            Format('✓ {item}'),
+            Format('{item}'),
+            'in_time',
+            lambda item: item.replace(':', '_').replace('другое', 'other'),
+            ['12:00', '15:00', '18:00', 'другое'],
+            when=lambda data, radio, manager: manager.find('autosend_schedule').is_checked()
+        ),
+        Checkbox(Const('✓ повторять'), Const('повторять'), 'loop',
+                 when=lambda data, radio, manager: manager.find('autosend_schedule').is_checked()),
+        Group(
+            Radio(
+                Format('✓ {item[1]}'),
+                Format('{item[1]}'),
+                'interval',
+                lambda item: item[0],
+                [(0, 'каждый день'), (1, 'раз в неделю'), (2, 'раз в месяц')],
+                when=lambda data, radio, manager: (manager.find('loop').is_checked() and
+                                                   manager.find('autosend_schedule').is_checked())
+            ),
+            width=2
+        ),
+        Button(Const('сохранить'), 'save_time_schedule', on_save_autosend_schedule),
+        state=NotificationStates.SELECT_TIME_SCHEDULE
+    ),
+    Window(
+        Const('введи время в формате часы:минуты, когда нужно мне отправить'),
+        TextInput('input_custom_time', on_success=on_input_custom_time),
+        state=NotificationStates.INPUT_CUSTOM_TIME
+    ),
+    Window(
+        Const('отправка расписания сохранена'),
+        SwitchTo(Const('назад'), 'back', NotificationStates.MAIN),
+        state=NotificationStates.STATUS
+    )
 )
 
 

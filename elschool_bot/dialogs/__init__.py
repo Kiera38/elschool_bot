@@ -110,7 +110,7 @@ async def start_help(message, dialog_manager):
 @router.message(Command('restoreschedules'))
 async def restore_schedules(message: Message, dialog_manager: DialogManager, notifications):
     logger.info(f'разработчик с id {message.from_user.id} решил восстановить отправки по времени')
-    await notifications.restore_grades_task(dialog_manager)
+    await notifications.restore_id_task(dialog_manager)
     await message.answer('все отправки восстановлены')
 
 

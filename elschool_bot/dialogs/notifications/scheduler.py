@@ -7,6 +7,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import TelegramObject
 from aiogram_dialog import DialogManager, Dialog, BaseDialogManager, StartMode
 
+from elschool_bot.dialogs import schedule
 from elschool_bot.dialogs.grades import (start_get_grades, process_result, show_default,
                                          filter_marks, filter_selected, filter_without_marks, show_statistics)
 from elschool_bot.repository import Repo
@@ -21,14 +22,14 @@ class Scheduler:
     def __init__(self):
         self.tasks = {}
 
-    def add_grades_task(self, manager: DialogManager, next_time, id):
+    def add_id_task(self, manager: DialogManager, next_time, id):
         if next_time is None:
             raise ValueError('не выбрано время отправки')
         delay = self.get_delay(next_time)
         self.add_task(delay, id, manager)
 
     def add_task(self, delay, id, manager):
-        task = asyncio.create_task(self.show_grades(manager.bg(stack_id=''), id, delay))
+        task = asyncio.create_task(self.show_id(manager.bg(stack_id=''), id, delay))
         self.tasks[(manager.event.from_user.id, id)] = task
 
     def get_delay(self, next_time):
@@ -46,12 +47,12 @@ class Scheduler:
             next_time += datetime.timedelta(days=1)
         return (next_time - now).total_seconds()
 
-    def remove_grades_task(self, user_id, id):
+    def remove_id_task(self, user_id, id):
         if (user_id, id) in self.tasks:
             task = self.tasks.pop((user_id, id))
             task.cancel()
 
-    def add_grades_interval_task(self, manager: DialogManager, next_time, interval, id):
+    def add_id_interval_task(self, manager: DialogManager, next_time, interval, id):
         next_time = self.get_next_time(next_time)
         if interval == 0:
             next_time += datetime.timedelta(days=1)
@@ -66,11 +67,11 @@ class Scheduler:
         delay = self.get_next_time_delay(next_time)
         self.add_task(delay, id, manager)
 
-    async def show_grades(self, manager: BaseDialogManager, id, delay):
+    async def show_id(self, manager: BaseDialogManager, id, delay):
         await asyncio.sleep(delay)
         await manager.start(SchedulerShowStates.STATUS, {'notifications': self, 'id': id}, StartMode.NEW_STACK)
 
-    async def restore_grades_task(self, manager: DialogManager):
+    async def restore_id_task(self, manager: DialogManager):
         repo = manager.middleware_data['repo']
         schedules = await repo.get_schedules_for_restore()
         for user_id, user_schedules in schedules.items():
@@ -78,7 +79,7 @@ class Scheduler:
             for schedule in user_schedules:
                 id = schedule['id']
                 delay = self.get_delay(schedule['next_time'])
-                task = asyncio.create_task(self.show_grades(bg, id, delay))
+                task = asyncio.create_task(self.show_id(bg, id, delay))
                 self.tasks[(user_id, id)] = task
 
 
@@ -138,13 +139,33 @@ async def select_grades(grades, manager: DialogManager):
         await show_statistics(grades, manager, marks_selected, filters, value_filters, False)
 
     if interval != -1:
-        scheduler.add_grades_interval_task(manager, next_time, interval, id)
+        scheduler.add_id_interval_task(manager, next_time, interval, id)
     else:
         await repo.remove_schedule(user_id, id)
-        scheduler.remove_grades_task(user_id, id)
+        scheduler.remove_id_task(user_id, id)
+
+
+async def show_schedule(manager: DialogManager):
+    date = datetime.date.today() + datetime.timedelta(days=1)
+    await schedule.start_date(manager, date)
+
+    repo = manager.middleware_data['repo']
+    user_id = manager.event.from_user.id
+    time, interval = await repo.get_user_autosend_schedule(user_id)
+    scheduler = manager.start_data['notifications']
+
+    if interval != -1:
+        scheduler.add_id_interval_task(manager, time, interval, -1)
+    else:
+        await repo.set_user_autosend_schedule(user_id, None, -1)
+        scheduler.remove_id_task(user_id, -1)
 
 
 async def on_start(start_data, manager: DialogManager):
+    if start_data['id'] == -1:
+        await show_schedule(manager)
+        return
+
     grades = await start_get_grades(manager)
     if grades:
         await select_grades(grades, manager)
