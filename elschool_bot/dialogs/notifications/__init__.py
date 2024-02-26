@@ -1,7 +1,7 @@
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, Window, DialogManager
 from aiogram_dialog.widgets.input import TextInput
-from aiogram_dialog.widgets.kbd import Button, Checkbox, Radio, Group, SwitchTo
+from aiogram_dialog.widgets.kbd import Button, Checkbox, Radio, Group, SwitchTo, ManagedCheckbox
 from aiogram_dialog.widgets.text import Const, Format
 
 from elschool_bot.dialogs.notifications import scheduler, autosending
@@ -37,7 +37,7 @@ async def on_autosend_schedule(event, button, manager: DialogManager):
             await in_time.set_checked('other')
             manager.dialog_data['autosend_schedule_time'] = time
 
-        if interval != -1:
+        if interval is not None and interval != -1:
             await loop.set_checked(True)
             await manager.find('interval').set_checked(interval)
         else:
@@ -76,6 +76,23 @@ async def on_input_custom_time(event, text_input, manager: DialogManager, text):
     await manager.switch_to(NotificationStates.SELECT_TIME_SCHEDULE)
 
 
+async def on_start(data, manager: DialogManager):
+    repo = manager.middleware_data['repo']
+    notify_change_schedule = await repo.get_user_notify_change_schedule(manager.event.from_user.id)
+    if notify_change_schedule is None:
+        notify_change_schedule = False
+    manager.dialog_data['notify_change_schedule'] = notify_change_schedule
+    await manager.find('send_when_change').set_checked(notify_change_schedule)
+
+
+async def on_send_when_change(event, checkbox: ManagedCheckbox, manager: DialogManager):
+    is_checked = checkbox.is_checked()
+    if is_checked != manager.dialog_data['notify_change_schedule']:
+        repo = manager.middleware_data['repo']
+        await repo.set_user_notify_change_schedule(event.from_user.id, is_checked)
+        manager.dialog_data['notify_change_schedule'] = is_checked
+
+
 dialog = Dialog(
     Window(
         Const('настройка уведомлений'),
@@ -84,28 +101,29 @@ dialog = Dialog(
         Checkbox(
             Const('✓ отправлять расписание при изменениях'),
             Const('отправлять расписание при изменениях'),
-            'send_when_change'
+            'send_when_change',
+            on_state_changed=on_send_when_change
         ),
-        Checkbox(
-            Const('✓ отправлять перед уроком'),
-            Const('отправлять перед уроком'),
-            'send_before_lesson'
-        ),
-        Checkbox(
-            Const('✓ отправлять после урока'),
-            Const('отправлять после урока'),
-            'send_before_lesson'
-        ),
-        Checkbox(
-            Const('✓ отправлять перед уроками'),
-            Const('отправлять перед уроками'),
-            'send_before_lesson'
-        ),
-        Checkbox(
-            Const('✓ отправлять после уроков'),
-            Const('отправлять после уроков'),
-            'send_before_lesson'
-        ),
+        # Checkbox(
+        #     Const('✓ отправлять перед уроком'),
+        #     Const('отправлять перед уроком'),
+        #     'send_before_lesson'
+        # ),
+        # Checkbox(
+        #     Const('✓ отправлять после урока'),
+        #     Const('отправлять после урока'),
+        #     'send_before_lesson'
+        # ),
+        # Checkbox(
+        #     Const('✓ отправлять перед уроками'),
+        #     Const('отправлять перед уроками'),
+        #     'send_before_lesson'
+        # ),
+        # Checkbox(
+        #     Const('✓ отправлять после уроков'),
+        #     Const('отправлять после уроков'),
+        #     'send_before_lesson'
+        # ),
         state=NotificationStates.MAIN
     ),
     Window(
@@ -149,7 +167,8 @@ dialog = Dialog(
         Const('отправка расписания сохранена'),
         SwitchTo(Const('назад'), 'back', NotificationStates.MAIN),
         state=NotificationStates.STATUS
-    )
+    ),
+    on_start=on_start
 )
 
 

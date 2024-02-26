@@ -1,3 +1,4 @@
+import os
 import textwrap
 
 from aiogram.fsm.state import StatesGroup, State
@@ -84,11 +85,11 @@ dialog = Dialog(
         
         Также можно посмотреть свои итоговые оценки за определённую часть года или за весь год.
         ''')),
-        # StaticMedia(path=''),
-        # StaticMedia(path=''),
-        # StaticMedia(path=''),
-        # StaticMedia(path=''),
-        # StaticMedia(path=''),
+        # StaticMedia(path='images/common_statistics.jpg'),
+        StaticMedia(path='images/detail_statistics.png'),
+        # StaticMedia(path='images/grades_list.jpg'),
+        # StaticMedia(path='images/grades_list_with_changes.jpg'),
+        # StaticMedia(path='images/results_grades.png'),
         SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
         state=HelpStates.VIEW_GRADES
     ),
@@ -98,21 +99,21 @@ dialog = Dialog(
         
         Также есть удобная кнопка для просмотра расписания звонков на сегодня. Это также включает подсказку о том, когда закончится урок. Все мы любим смотреть сколько осталось до канца урока.
         ''')),
-        # StaticMedia(path=''),
-        # StaticMedia(path=''),
-        # StaticMedia(path=''),
+        StaticMedia(path='images/schedule.png'),
+        # StaticMedia(path='images/schedule_and_marks.jpg'),
+        # StaticMedia(path='images/schedule_time.png'),
         SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
         state=HelpStates.VIEW_SCHEDULE
     ),
     Window(
         Const(textwrap.dedent('''
         Бывает такое, что присылают изменения в расписании, и расписание из elschool уже неправильное. Бот может сохранить эти изменения у себя.
-        Изменения сохраняются сразу для всего класса, так что их указывать может только 1 человек.
+        Изменения сохраняются сразу для всего класса, так что их указывать может только 1 человеку. Остальные сами узнают об этих изменениях.
         
-        Изменения в расписании является эксперементальной функцией. Возможны ошибки в работе.
+        Изменения в расписании является эксперементальной функцией. Возможны ошибки в работе. Возможны изменения с обновлениями.
         ''')),
-        # StaticMedia(path=''),
-        # StaticMedia(path=''),
+        StaticMedia(path='images/edit_schedule.jpg'),
+        # StaticMedia(path='images/'),
         SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
         state=HelpStates.SAVE_EDITS
     ),
@@ -121,7 +122,8 @@ dialog = Dialog(
         Забыл домашнее задание? Может вообще не знал? Не беда. Записывай его сюда. Ну а также можешь посмотреть, какую домашку записали другие пользователи из твоего класса.
         Если кто-то спрашивает у тебя что задали - отправляй его ко мне. Сам всё узнает.
         ''')),
-        # StaticMedia(path=''),
+        StaticMedia(path='images/save_homework.png'),
+        # StaticMedia(path='images/schedule.png'),
         SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
         state=HelpStates.VIEW_HOMEWORK
     ),
@@ -137,6 +139,8 @@ dialog = Dialog(
         5) После всех уроков
         
         Отправлять можно оценки или расписание.
+        
+        Сейчас бот может отправлять только в определённое время. Возможность отправлять с привязкой к расписанию звонков появится в ближайшее время.
         ''')),
         # StaticMedia(path=''),
         # StaticMedia(path=''),
@@ -193,15 +197,25 @@ dialog = Dialog(
         Количество оценок
         Список оценок с датами урока и проставления
         Подсказки по исправлению
+        
+        Изначально в этом варианте показывается общая статистика. Если нужна детальная, то нужно нажать на кнопку ">>" или "<<", чтобы сменить страницу на другую.
+        Также, нажав на кнопку "общая" или с названием предмета, можно выбрать любой предмет или открыть общую статистику.
         ''')),
+        # StaticMedia(path='images/grades_statistics_settings.png'),
+        StaticMedia(path='images/common_statistics.jpg'),
+        # StaticMedia(path='images/detail_statistics.png'),
+        # StaticMedia(path='images/select_statistics_page.png'),
         SwitchTo(Const('назад'), 'back', HelpStates.GRADES),
-        state=HelpStates.GRADES_STATISTICS
+        state=HelpStates.GRADES_STATISTICS,
+        parse_mode=''
     ),
     Window(
         Const(textwrap.dedent('''
         Список. 
-        Показываются все оценки по всем предметам. Также можно включить показ подсказок по исправлению.
+        Показываются все оценки по всем предметам с учётом настроенных фильтров. Также можно включить подсказки по исправлению.
         ''')),
+        # StaticMedia(path='images/grades_list_settings.png'),
+        StaticMedia(path='images/grades_list.jpg'),
         SwitchTo(Const('назад'), 'back', HelpStates.GRADES),
         state=HelpStates.GRADES_LIST
     ),
@@ -213,7 +227,7 @@ dialog = Dialog(
         Показывать без оценок. 
         Если эта настройка не включена, то предметы без оценок показываться не будут.
         
-        выбрать из списка (доступна только в при выборе списка). 
+        Выбрать из списка (доступна только в при выборе списка). 
         Показывать только определённые предметы.
         
         Дата урока. 
@@ -225,6 +239,8 @@ dialog = Dialog(
         Сами оценки. 
         Можно например показывать только 4 или 4 и 5.
         ''')),
+        StaticMedia(path='images/grades_statistics_settings.png'),
+        # StaticMedia(path='images/select_lessons_list_grades.png'),
         SwitchTo(Const('назад'), 'back', HelpStates.GRADES),
         state=HelpStates.GRADES_FILTERS
     ),
@@ -234,6 +250,7 @@ dialog = Dialog(
         Бот может показать итоговые оценки за часть года и год. Для этого нужно нажать на кнопку "итоговые оценки".
         В этом сообщении также будет количество оценок.
         ''')),
+        StaticMedia(path='images/results_grades.jpg'),
         SwitchTo(Const('назад'), 'back', HelpStates.GRADES),
         state=HelpStates.RESULTS_GRADES
     ),
@@ -254,19 +271,20 @@ dialog = Dialog(
     Window(
         Const(textwrap.dedent('''
         Бывает такое, что присылают изменения в расписании. В таком случае расписание из elschool становится неправильным.
-        Бот позволяет указывать изменения. Эти изменения сохраняются для всего класса, поэтому их можно сохранять только 1 человеку.
+        Бот позволяет указывать изменения. Эти изменения сохраняются для всего класса.
         
         Для сохранения изменений можно нажать на кнопку изменения в расписании прямо под расписанием на определённый день.
-        в отрывшемся окне можно изменять уроки, добавлять новые и удалять которых не будет в этот день.
+        в отрывшемся окне можно изменять уроки, добавлять новые и удалять, которых не будет в этот день.
         Для добавления нового урока нужно нажать на кнопку "новый урок" и ввести номер урока с названием.
-        После этого его можно будет также редактировать, как и остальные.
         
         Для редактирования урока нужно нажать на кнопку с нужным уроком, и выбрать что именно нужно изменить, а затем ввести изменённый вариант.
-        Изменять можно название урока, время начала и конца, домашнее задание. Здесь же можно и удалить урок, нажав на кнопку "нет урока".
+        Изменять можно название урока, время начала и конца, домашнее задание. Здесь же можно и удалить урок.
         
         ВНИМАНИЕ! Сделав неправильные изменения ты подставляешь весь свой класс. Пожалуйста указывайте только правильные изменения. 
-        Изменения в расписании является экспериментальной. Возможны ошибки в работе.
+        Изменения в расписании является экспериментальной возможностью. Возможны ошибки в работе.
         ''')),
+        StaticMedia(path='images/edit_schedule.jpg'),
+        # StaticMedia(path=''),
         SwitchTo(Const('назад'), 'back', HelpStates.SCHEDULE),
         state=HelpStates.SCHEDULE_CHANGES
     ),
@@ -277,8 +295,11 @@ dialog = Dialog(
         После этого выбираешь любой день недели и изменяешь.
         
         ВНИМАНИЕ! Сделав неправильные изменения ты подставляешь весь свой класс. Пожалуйста указывайте только правильные изменения. 
-        Изменения в расписании является экспериментальной функцией. Возможны ошибки в работе.
+        Изменения в расписании является экспериментальной возможностью. Возможны ошибки в работе. Реализация изменится в будущей версии.
         ''')),
+        StaticMedia(path='images/default_changes_day.png'),
+        # StaticMedia(path='images/edit_schedule.jpg'),
+        # StaticMedia(path=''),
         SwitchTo(Const('назад'), 'back', HelpStates.SCHEDULE),
         state=HelpStates.DEFAULT_SCHEDULE_CHANGES
     ),
@@ -291,6 +312,8 @@ dialog = Dialog(
         Записать домашку. 
         позволяет записать домашку на следующий урок. выбор из тех уроков, которые были сегодня.
         ''')),
+        # StaticMedia(path='images/schedule_time.png'),
+        # StaticMedia(path='images/save_homework.png'),
         SwitchTo(Const('назад'), 'back', HelpStates.SCHEDULE),
         state=HelpStates.SCHEDULE_BUTTONS
     ),
@@ -300,6 +323,7 @@ dialog = Dialog(
         Бот может сам отправлять сообщения с различной информацией. 
         Чтобы это настроить, нужно нажать на кнопку "уведомления".
         ''')),
+        StaticMedia(path='images/notifications.png'),
         SwitchTo(Const('автоматическая отправка оценок'), 'autosend_grades', HelpStates.AUTOSEND_GRADES),
         SwitchTo(Const('отправлять расписание'), 'autosend_schedule', HelpStates.AUTOSEND_SCHEDULE),
         SwitchTo(Const('Отправлять расписание при изменениях'), 'notify_schedule_changes',
@@ -324,22 +348,26 @@ dialog = Dialog(
         
         показывать.
         Позволяет указать когда стоит показывать сообщение с оценками.
+        Там можно настроить время, когда отправиться сообщение, а также как часто нужно присылать повторно с новыми данными.
         ''')),
+        StaticMedia(path='images/autosend_grades_settings.png'),
+        # StaticMedia(path='images/select_autosend_time.png'),
         SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
         state=HelpStates.AUTOSEND_GRADES
     ),
     Window(
         Const(textwrap.dedent('''
         Отправлять расписание. 
-        Автоматически отправлять расписание на следующий день в определённое время.
+        Автоматически отправлять расписание на следующий день в определённое время. Можно указать время, и как часто нужно присылать повторно с новыми данными.
         ''')),
+        StaticMedia(path='images/select_autosend_schedule_time.png'),
         SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
         state=HelpStates.AUTOSEND_SCHEDULE
     ),
     Window(
         Const(textwrap.dedent('''
         Отправлять расписание при изменениях. 
-        Когда кто-то из твоего класса сохранил изменения расписание отправить новое расписание тебе.
+        Когда кто-то из твоего класса сохранил изменения расписание, отправить новое расписание тебе.
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
         state=HelpStates.NOTIFY_SCHEDULE_CHANGE
@@ -348,6 +376,8 @@ dialog = Dialog(
         Const(textwrap.dedent('''
         Отправлять перед уроком. 
         отправить различную информацию об уроке перед его началом.
+        
+        Скоро
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
         state=HelpStates.START_LESSON
@@ -356,6 +386,8 @@ dialog = Dialog(
         Const(textwrap.dedent('''
         Отправлять после урока. 
         отправить различную информацию об уроке после его окончания.
+        
+        Скоро
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
         state=HelpStates.END_LESSON
@@ -364,6 +396,8 @@ dialog = Dialog(
         Const(textwrap.dedent('''
         Отправлять перед уроками. 
         отправить различную информацию обо всех уроках перед началом.
+        
+        Скоро
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
         state=HelpStates.START_LESSONS
@@ -372,6 +406,8 @@ dialog = Dialog(
         Const(textwrap.dedent('''
         Отправлять после уроков. 
         отправить различную информацию обо всех уроках после окончания.
+        
+        Скоро
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
         state=HelpStates.END_LESSONS
@@ -383,6 +419,7 @@ dialog = Dialog(
         Если ты не зарегистрирован, то будет кнопка "регистрация", а если зарегистрирован, то кнопки "изменить данные" и "удалить данные".
         Остальные кнопки показываются всегда.
         ''')),
+        StaticMedia(path='images/settings.png'),
         SwitchTo(Const('регистрация'), 'register', HelpStates.REGISTER),
         SwitchTo(Const('изменить данные'), 'change_data', HelpStates.CHANGE_DATA),
         SwitchTo(Const('удалить данные'), 'remove_data', HelpStates.REMOVE_DATA),
@@ -396,7 +433,7 @@ dialog = Dialog(
     Window(
         Const(textwrap.dedent('''
         Регистрация. 
-        Позволяет зарегистрироваться. Без этого многие возможности не будут работать.
+        Позволяет зарегистрироваться. Без этого многие возможности не будут работать. Для более подробной информации передите к разделу "регистрация" в основном меню помощи
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
         state=HelpStates.REGISTER
@@ -404,7 +441,7 @@ dialog = Dialog(
     Window(
         Const(textwrap.dedent('''
         Изменить данные. 
-        Позволяет изменять данные регистрации.
+        Позволяет изменять данные регистрации. Если некоторых данных недостаточно бот может спросить их. Такие данные сохраняться не будут. Они нужны только для проверки новых .
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
         state=HelpStates.CHANGE_DATA
@@ -436,7 +473,7 @@ dialog = Dialog(
     Window(
         Const(textwrap.dedent('''
         часть года. 
-        Позволяет выбрать текущую часть года. Это нужно при получении оценок.
+        Позволяет выбрать текущую часть года. Это нужно при получении оценок. Когда бот получает оценки, он использует эту настройку, чтобы показывать тоько актуальные оценки.
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
         state=HelpStates.CHANGE_QUARTER
@@ -444,7 +481,7 @@ dialog = Dialog(
     Window(
         Const(textwrap.dedent('''
         Время кеширования. 
-        Информация, полученная с сервера кешируется, чтобы не нагружать сервер лишними запросами. эта настройка позволяет указать максимальное время хранения в кеше.
+        Информация, полученная с сервера кешируется, чтобы не нагружать сервер лишними запросами. Эта настройка позволяет указать максимальное время хранения в кеше.
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
         state=HelpStates.CHANGE_CACHE_TIME
@@ -455,8 +492,6 @@ dialog = Dialog(
         Нашли ошибку? А может есть предложение по улучшению? Вы всегда можете написать разработчику @izrupy.
         
         Канал с новостями и другой важной информацией @elschoolbotnews.
-        
-        Исходный код (там сейчас всё плохо) теперь расположен в gitverse https://gitverse.ru/izpy/elschool_bot.
         ''')),
         SwitchTo(Const('назад'), 'back', HelpStates.MAIN),
         state=HelpStates.CONTACTS

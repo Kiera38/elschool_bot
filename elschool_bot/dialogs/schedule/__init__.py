@@ -41,8 +41,9 @@ async def start_date(manager: DialogManager, date):
     await manager.start(ScheduleStates.STATUS, {'type': 'date', 'date': date})
 
 
-async def start_schedule(manager: BaseDialogManager, schedule):
-    await manager.start(ScheduleStates.STATUS, {'type': 'schedule', 'schedule': schedule}, mode=StartMode.NEW_STACK)
+async def start_schedule(manager: BaseDialogManager, schedule, day):
+    await manager.start(ScheduleStates.STATUS, {'type': 'schedule', 'schedule': schedule, 'day': day},
+                        mode=StartMode.NEW_STACK)
 
 
 async def on_select_day(event: ChatEvent, widget: ManagedCalendar, manager: DialogManager, date):
@@ -105,8 +106,7 @@ async def show_schedule(manager: DialogManager, schedule):
 async def get_schedule_after_error(manager, repo: Repo, date):
     try:
         schedule = await repo.get_diaries(manager.event.from_user.id, date)
-        if isinstance(schedule, str):
-            await status.update(manager, schedule)
+        if not await check_schedule(schedule, manager):
             return None
     except RegisterError as e:
         status_text = manager.dialog_data['status']
@@ -116,12 +116,21 @@ async def get_schedule_after_error(manager, repo: Repo, date):
         return schedule
 
 
+async def check_schedule(schedule, manager):
+    if schedule is None:
+        await status.update(manager, 'не найдено расписание на этот день')
+        return False
+    if isinstance(schedule, str):
+        await status.update(manager, schedule)
+        return False
+    return True
+
+
 async def get_schedule(manager: DialogManager, repo: Repo, date):
     try:
-        manager.dialog_data['date'] = date
+        manager.dialog_data['day'] = date
         schedule = await repo.get_diaries(manager.event.from_user.id, date)
-        if isinstance(schedule, str):
-            await status.update(manager, schedule)
+        if not await check_schedule(schedule, manager):
             return None
     except RegisterError as e:
         status.set(manager, 'получение расписания')
@@ -134,7 +143,7 @@ async def get_schedule(manager: DialogManager, repo: Repo, date):
 async def on_process_result(start_data, result, manager: DialogManager):
     if await grades.process_results_without_grades(start_data, result, manager):
         repo = manager.middleware_data['repo']
-        date = manager.dialog_data['date']
+        date = manager.dialog_data['day']
         if manager.dialog_data.get('marks'):
             marks = await get_marks_after_error(manager, repo, manager.event.from_user.id)
             if marks:
@@ -153,15 +162,20 @@ async def on_process_result(start_data, result, manager: DialogManager):
         save_lessons(result, manager)
         user_id = manager.event.from_user.id
         repo = manager.middleware_data['repo']
-        class_users = await repo.get_class_users_notify_change_schedule(user_id)
-        schedule = manager.dialog_data['schedule']
-        for user in class_users:
-            await start_schedule(manager.bg(user, user, ''), schedule)
+        await notify_users(manager, repo, user_id)
+
+
+async def notify_users(manager, repo, user_id):
+    class_users = await repo.get_class_users_notify_change_schedule(user_id)
+    schedule = manager.dialog_data['schedule']
+    day = manager.dialog_data['day']
+    for user in class_users:
+        await start_schedule(manager.bg(user, user, ''), schedule, day)
 
 
 async def on_edit(event, button, manager: DialogManager):
     manager.dialog_data['has_marks'] = False
-    await edit.start(manager.dialog_data['schedule'].copy(), manager.dialog_data['date'], manager)
+    await edit.start(manager.dialog_data['schedule'].copy(), manager.dialog_data['day'], manager)
 
 
 async def on_default_edit(event, select, manager: DialogManager, item):
@@ -196,6 +210,7 @@ async def on_start(data, manager: DialogManager):
             if schedule:
                 await show_schedule(manager, schedule)
         elif data['type'] == 'schedule':
+            manager.dialog_data['day'] = data['day']
             await show_schedule(manager, data['schedule'])
 
     if data in ('time', 'homework'):
@@ -284,6 +299,7 @@ dialog = Dialog(
         state=ScheduleStates.SELECT_DAY),
     Window(Format('{status}'), state=ScheduleStates.STATUS, getter=getter),
     Window(
+        Format('расписание на {dialog_data[day]: %d.%m.%Y}'),
         List(
             Multi(
                 Format('{item[number]}. {item[name]}'),

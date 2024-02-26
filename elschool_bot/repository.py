@@ -319,7 +319,8 @@ class Repo:
         day = datetime.date.today() + datetime.timedelta(days=1)
         for i in range(30):
             diaries = await self.get_diaries(user_id, day)
-            if isinstance(diaries, str):
+            if diaries is None or isinstance(diaries, str):
+                day += datetime.timedelta(days=1)
                 continue
             for day_lesson in diaries.values():
                 if day_lesson['name'] == lesson:

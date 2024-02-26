@@ -30,7 +30,7 @@ def load_config():
     return Config(
         bot=BotConfig(token=os.environ['BOT_TOKEN'], parse_mode='html'),
         logging=LoggingConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
-        dbfile='bot.db', storage_file='storage.pkl'
+        dbfile='bot.db', storage_file=None
     )
 
 
@@ -43,6 +43,7 @@ async def main():
     register_handlers(dispatcher, config)
     await set_commands(bot)
     await dispatcher.start_polling(bot)
+    await storage.close()
 
 
 if __name__ == '__main__':

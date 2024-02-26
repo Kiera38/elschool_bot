@@ -135,7 +135,7 @@ async def show_default(grades, manager, filters, value_filters, show_back=True):
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
         fix_lessons[lesson] = {
-            'fix': fix_text(marks, mean),
+            'fix': fix_text(marks, mean) if mean else '',
             'mean': mean
         }
     grades = filter_grades(grades, filters, value_filters)

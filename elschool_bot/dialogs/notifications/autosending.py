@@ -141,7 +141,9 @@ async def on_save_schedule(query, button, manager: DialogManager):
         next_time = manager.dialog_data['custom_time'].replace(':', '_')
 
     if manager.find('loop').is_checked():
-        interval = int(manager.find('interval').get_checked())
+        interval = manager.find('interval').get_checked()
+        if interval is None:
+            interval = -1
     else:
         interval = -1
 
