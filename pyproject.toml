@@ -16,3 +16,6 @@ dependencies = [
 
 [project.scripts]
 elschool = "elschool_bot:main"
+
+[tool.setuptools.packages.find]
+exclude = ['db/**', 'images/**']

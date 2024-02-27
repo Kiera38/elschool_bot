@@ -94,7 +94,7 @@ async def on_save(event, button, manager: DialogManager):
     edits = manager.dialog_data['edits']
     repo: Repo = manager.middleware_data['repo']
     await repo.add_changes(event.from_user.id, manager.start_data[1], edits)
-    await manager.done()
+    await manager.done(manager.start_data[0])
 
 
 def get_lessons(data):

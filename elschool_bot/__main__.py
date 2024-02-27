@@ -4,6 +4,7 @@ import os
 import pickle
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage, SimpleEventIsolation
 
 from elschool_bot import Config, BotConfig, LoggingConfig
@@ -30,14 +31,14 @@ def load_config():
     return Config(
         bot=BotConfig(token=os.environ['BOT_TOKEN'], parse_mode='html'),
         logging=LoggingConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
-        dbfile='bot.db', storage_file=None
+        dbfile='bot.db'
     )
 
 
 async def main():
     config = load_config()
     logging.basicConfig(level=config.logging.level, format=config.logging.format)
-    bot = Bot(config.bot.token, parse_mode=config.bot.parse_mode)
+    bot = Bot(config.bot.token, default=DefaultBotProperties(parse_mode=config.bot.parse_mode))
     storage = PickleStorage(config.storage_file) if config.storage_file is not None else MemoryStorage()
     dispatcher = Dispatcher(storage=storage, events_isolation=SimpleEventIsolation())
     register_handlers(dispatcher, config)

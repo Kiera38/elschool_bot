@@ -32,14 +32,15 @@ class Repo:
         return await elschool.register(login, password)
 
     async def register_user(self, user_id, jwtoken, url, quarter, login=None, password=None):
+        class_id = self._class_id_from_url(url)
         await self.db.execute(
-            'INSERT INTO users (id, jwtoken, url, quarter, login, password) VALUES (?, ?, ?, ?, ?, ?)',
-            (user_id, jwtoken, url, quarter, login, password))
+            'INSERT INTO users (id, jwtoken, url, class_id, quarter, login, password) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (user_id, jwtoken, url, class_id, quarter, login, password))
         await self.db.commit()
         logger.info(f'пользователь с id {user_id} зарегистрировался')
 
     async def update_data(self, user_id, jwtoken, login=None, password=None):
-        await self.db.execute('UPDATE users SET jwtoken=?, login=?, password=?, last_cache=0 WHERE id=?',
+        await self.db.execute('UPDATE users SET jwtoken=?, login=?, password=?, url=NULL, last_cache=0 WHERE id=?',
                               (jwtoken, login, password, user_id))
         await self.db.commit()
         logger.info(f'пользователь с id {user_id} обновил свои данные')
@@ -180,7 +181,7 @@ class Repo:
                 schedules[user_id] = []
             schedules[user_id].append({'id': id, 'next_time': next_time})
 
-        cursor = await self.db.execute('SELECT id, autosend_schedule_time WHERE autosend_schedule_time!=NULL')
+        cursor = await self.db.execute('SELECT id, autosend_schedule_time FROM users WHERE autosend_schedule_time!=NULL')
         async for user_id, time in cursor:
             if user_id not in schedules:
                 schedules[user_id] = []
@@ -195,7 +196,8 @@ class Repo:
             return await elschool.get_results(jwtoken, url)
         else:
             results, url = await elschool.get_results_and_url(jwtoken)
-            await self.db.execute('UPDATE users SET url=?', (url,))
+            class_id = self._class_id_from_url(url)
+            await self.db.execute('UPDATE users SET url=?, class_id=? WHERE id=?', (url, class_id, user_id))
             await self.db.commit()
             return results
 
@@ -230,9 +232,19 @@ class Repo:
     def _as_timestamp(self, date: datetime.date):
         return datetime.datetime(date.year, date.month, date.day).timestamp()
 
+    async def check_class_id(self, class_id, user_id, need_commit=True):
+        if class_id is None:
+            cursor = await self.db.execute('SELECT url FROM users WHERE id=?', (user_id,))
+            url, = await cursor.fetchone()
+            class_id = self._class_id_from_url(url)
+            await self.db.execute('UPDATE users SET class_id=? WHERE id=?', (class_id, user_id))
+            if need_commit:
+                await self.db.commit()
+        return class_id
+
     async def _get_diaries_changes(self, cursor: aiosqlite.Cursor, user_id, timestamp):
         await cursor.execute('SELECT class_id FROM users WHERE id=?', (user_id,))
-        class_id = (await cursor.fetchone())[0]
+        class_id = await self.check_class_id((await cursor.fetchone())[0], user_id)
         await cursor.execute('SELECT number, name, start_time, end_time, homework, remove FROM schedule_changes '
                              'WHERE class_id=? AND date=?', (class_id, timestamp))
         changes = list(await cursor.fetchall())
@@ -310,6 +322,7 @@ class Repo:
     async def _add_changes(self, user_id, timestamp, changes):
         cursor = await self.db.execute('SELECT class_id FROM users WHERE id=?', (user_id,))
         class_id, = await cursor.fetchone()
+        class_id = await self.check_class_id(class_id, user_id, False)
         data = [(class_id, timestamp, number, lesson.get('name'), lesson.get('start_time'), lesson.get('end_time'),
                  lesson.get('homework'), lesson.get('homework_next'), lesson.get('remove'))
                 for number, lesson in changes.items()]
@@ -353,10 +366,12 @@ class Repo:
         await self.db.commit()
 
     async def get_class_users_notify_change_schedule(self, user_id):
-        cursor = await self.db.execute('SELECT id FROM users WHERE class_id=('
-                                       'SELECT class_id FROM users WHERE id=:id)'
+        cursor = await self.db.execute('SELECT class_id FROM users WHERE id=?', (user_id,))
+        class_id, = await cursor.fetchone()
+        class_id = await self.check_class_id(class_id, user_id)
+        cursor = await self.db.execute('SELECT id FROM users WHERE class_id=?'
                                        'AND notify_change_schedule',
-                                       {'id': user_id})
+                                       (class_id,))
         return [i[0] async for i in cursor]
 
 

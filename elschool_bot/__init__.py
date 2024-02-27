@@ -18,7 +18,7 @@ class Config:
     bot: BotConfig
     logging: LoggingConfig
     dbfile: str
-    storage_file: str | None = None
+    storage_file: str = None
 
 
 def main():

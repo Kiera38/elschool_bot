@@ -85,19 +85,37 @@ async def results(message: Message, dialog_manager, repo):
 
 @router.message(Command('schedule'))
 @router.message(F.text == 'расписание')
-async def show_schedule(message, dialog_manager):
+async def show_schedule(message, dialog_manager, repo):
+    if not await repo.has_user(message.from_user.id):
+        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
+                     f'решил посмотреть расписание.')
+        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
+                             'Это можно сделать на вкладке настройки.')
+        return
     await schedule.start(dialog_manager)
 
 
 @router.message(Command('timeschedule'))
 @router.message(F.text == 'расписание звонков')
-async def show_time_schedule(message, dialog_manager):
+async def show_time_schedule(message, dialog_manager, repo):
+    if not await repo.has_user(message.from_user.id):
+        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
+                     f'решил посмотреть расписание звонков.')
+        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
+                             'Это можно сделать на вкладке настройки.')
+        return
     await schedule.start_time_schedule(dialog_manager)
 
 
 @router.message(Command('inputhomework'))
 @router.message(F.text == 'записать домашку')
-async def input_homework(message, dialog_manager):
+async def input_homework(message, dialog_manager, repo):
+    if not await repo.has_user(message.from_user.id):
+        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
+                     f'решил записать домашку.')
+        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
+                             'Это можно сделать на вкладке настройки.')
+        return
     await schedule.start_input_homework(dialog_manager)
 
 
