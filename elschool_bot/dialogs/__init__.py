@@ -3,141 +3,208 @@ import logging
 from aiogram import Dispatcher, Router, F, Bot
 from aiogram.filters import ExceptionTypeFilter
 from aiogram.filters.command import CommandStart, Command
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ErrorEvent, BotCommand, CallbackQuery
+from aiogram.types import (
+    Message,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    ErrorEvent,
+    BotCommand,
+    CallbackQuery,
+)
 from aiogram_dialog import DialogManager, StartMode, setup_dialogs
 from aiogram_dialog.api.entities import DIALOG_EVENT_NAME
 
-from elschool_bot.repository import RepoMiddleware, Repo, DataProcessError, RegisterError
-from . import settings, grades, input_data, notifications, date_selector, results_grades, schedule, help
+from elschool_bot.repository import (
+    RepoMiddleware,
+    Repo,
+    DataProcessError,
+    RegisterError,
+)
+from . import (
+    settings,
+    grades,
+    input_data,
+    notifications,
+    date_selector,
+    results_grades,
+    schedule,
+    help,
+)
 from .grades import start_select_grades
 from .notifications.scheduler import Scheduler, SchedulerMiddleware
 
 router = Router()
-main_menu = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='расписание'), KeyboardButton(text='оценки')],
-    [KeyboardButton(text='расписание звонков'), KeyboardButton(text='записать домашку')],
-    [KeyboardButton(text='итоговые оценки'), KeyboardButton(text='уведомления')],
-    [KeyboardButton(text='настройки'), KeyboardButton(text='помощь')]
-], resize_keyboard=True)
+main_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="расписание"), KeyboardButton(text="оценки")],
+        [
+            KeyboardButton(text="расписание звонков"),
+            KeyboardButton(text="записать домашку"),
+        ],
+        [KeyboardButton(text="итоговые оценки"), KeyboardButton(text="уведомления")],
+        [KeyboardButton(text="настройки"), KeyboardButton(text="помощь")],
+    ],
+    resize_keyboard=True,
+)
 logger = logging.getLogger(__name__)
 
 
 @router.message(CommandStart())
 async def start_command(message: Message):
-    logger.info(f'пользователь с id {message.from_user.id} использовал команду /start')
-    await message.answer('Привет, я Elschool Bot. Буду помогать тебе с учёбой. '
-                         'Для начала рекомендую зарегистрироваться или почитать помощь, '
-                         'чтобы разобраться с моими возможностями. Также советую подписаться на канал @elschoolbotnews.'
-                         'Там публикуется важная информация.',
-                         reply_markup=main_menu)
+    logger.info(f"пользователь с id {message.from_user.id} использовал команду /start")
+    await message.answer(
+        "Привет, я Elschool Bot. Буду помогать тебе с учёбой. "
+        "Для начала рекомендую зарегистрироваться или почитать помощь, "
+        "чтобы разобраться с моими возможностями. Также советую подписаться на канал @elschoolbotnews."
+        "Там публикуется важная информация.",
+        reply_markup=main_menu,
+    )
 
 
-@router.message(Command('settings'))
-@router.message(F.text == 'настройки')
+@router.message(Command("settings"))
+@router.message(F.text == "настройки")
 async def show_settings(message: Message, dialog_manager: DialogManager):
-    logger.debug(f'пользователь с id {message.from_user.id} решил посмотреть настройки')
+    logger.debug(f"пользователь с id {message.from_user.id} решил посмотреть настройки")
     await dialog_manager.start(settings.States.MAIN, mode=StartMode.RESET_STACK)
 
 
-@router.message(F.text == 'оценки')
+@router.message(F.text == "оценки")
 async def show_grades(message: Message, dialog_manager: DialogManager, repo: Repo):
     if not await repo.has_user(message.from_user.id):
-        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} решил получить оценки')
-        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
-                             'Это можно сделать на вкладке настройки.')
+        logger.debug(
+            f"незарегистрированный пользователь с id {message.from_user.id} решил получить оценки"
+        )
+        await message.answer(
+            "ты не зарегистрирован, попробуй сначала зарегистрироваться. "
+            "Это можно сделать на вкладке настройки."
+        )
         return
-    logger.debug(f'пользователь с id {message.from_user.id} решил получить оценки')
+    logger.debug(f"пользователь с id {message.from_user.id} решил получить оценки")
     await start_select_grades(dialog_manager)
 
 
-@router.message(Command('showmenu'))
-@router.message(F.text == 'меню')
+@router.message(Command("showmenu"))
+@router.message(F.text == "меню")
 async def show_menu(message: Message):
-    logger.debug(f'у пользователя с id {message.from_user.id} пропало основное меню')
-    await message.answer('основное меню', reply_markup=main_menu)
+    logger.debug(f"у пользователя с id {message.from_user.id} пропало основное меню")
+    await message.answer("основное меню", reply_markup=main_menu)
 
 
-@router.message(Command('notifications'))
-@router.message(F.text == 'уведомления')
+@router.message(Command("notifications"))
+@router.message(F.text == "уведомления")
 async def schedules(message: Message, dialog_manager, repo):
     if not await repo.has_user(message.from_user.id):
-        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
-                     f'решил по управлять своими отправками по времени')
-        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
-                             'Это можно сделать на вкладке настройки.')
+        logger.debug(
+            f"незарегистрированный пользователь с id {message.from_user.id} "
+            f"решил по управлять своими отправками по времени"
+        )
+        await message.answer(
+            "ты не зарегистрирован, попробуй сначала зарегистрироваться. "
+            "Это можно сделать на вкладке настройки."
+        )
         return
-    logger.debug(f'пользователь с id {message.from_user.id} решил посмотреть настройки уведомлений')
+    logger.debug(
+        f"пользователь с id {message.from_user.id} решил посмотреть настройки уведомлений"
+    )
     await notifications.show(dialog_manager)
 
 
-@router.message(Command('resultsgrades'))
-@router.message(F.text == 'итоговые оценки')
+@router.message(Command("resultsgrades"))
+@router.message(F.text == "итоговые оценки")
 async def results(message: Message, dialog_manager, repo):
     if not await repo.has_user(message.from_user.id):
-        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
-                     f'решил посмотреть свои итоговые оценки.')
-        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
-                             'Это можно сделать на вкладке настройки.')
+        logger.debug(
+            f"незарегистрированный пользователь с id {message.from_user.id} "
+            f"решил посмотреть свои итоговые оценки."
+        )
+        await message.answer(
+            "ты не зарегистрирован, попробуй сначала зарегистрироваться. "
+            "Это можно сделать на вкладке настройки."
+        )
         return
-    logger.debug(f'пользователь с id {message.from_user.id} решил посмотреть свои итоговые оценки')
+    logger.debug(
+        f"пользователь с id {message.from_user.id} решил посмотреть свои итоговые оценки"
+    )
     await results_grades.start(dialog_manager)
 
 
-@router.message(Command('schedule'))
-@router.message(F.text == 'расписание')
+@router.message(Command("schedule"))
+@router.message(F.text == "расписание")
 async def show_schedule(message, dialog_manager, repo):
     if not await repo.has_user(message.from_user.id):
-        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
-                     f'решил посмотреть расписание.')
-        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
-                             'Это можно сделать на вкладке настройки.')
+        logger.debug(
+            f"незарегистрированный пользователь с id {message.from_user.id} "
+            f"решил посмотреть расписание."
+        )
+        await message.answer(
+            "ты не зарегистрирован, попробуй сначала зарегистрироваться. "
+            "Это можно сделать на вкладке настройки."
+        )
         return
     await schedule.start(dialog_manager)
 
 
-@router.message(Command('timeschedule'))
-@router.message(F.text == 'расписание звонков')
+@router.message(Command("timeschedule"))
+@router.message(F.text == "расписание звонков")
 async def show_time_schedule(message, dialog_manager, repo):
     if not await repo.has_user(message.from_user.id):
-        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
-                     f'решил посмотреть расписание звонков.')
-        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
-                             'Это можно сделать на вкладке настройки.')
+        logger.debug(
+            f"незарегистрированный пользователь с id {message.from_user.id} "
+            f"решил посмотреть расписание звонков."
+        )
+        await message.answer(
+            "ты не зарегистрирован, попробуй сначала зарегистрироваться. "
+            "Это можно сделать на вкладке настройки."
+        )
         return
     await schedule.start_time_schedule(dialog_manager)
 
 
-@router.message(Command('inputhomework'))
-@router.message(F.text == 'записать домашку')
+@router.message(Command("inputhomework"))
+@router.message(F.text == "записать домашку")
 async def input_homework(message, dialog_manager, repo):
     if not await repo.has_user(message.from_user.id):
-        logger.debug(f'незарегистрированный пользователь с id {message.from_user.id} '
-                     f'решил записать домашку.')
-        await message.answer('ты не зарегистрирован, попробуй сначала зарегистрироваться. '
-                             'Это можно сделать на вкладке настройки.')
+        logger.debug(
+            f"незарегистрированный пользователь с id {message.from_user.id} "
+            f"решил записать домашку."
+        )
+        await message.answer(
+            "ты не зарегистрирован, попробуй сначала зарегистрироваться. "
+            "Это можно сделать на вкладке настройки."
+        )
         return
     await schedule.start_input_homework(dialog_manager)
 
 
-@router.message(Command('help'))
-@router.message(F.text == 'помощь')
+@router.message(Command("help"))
+@router.message(F.text == "помощь")
 async def start_help(message, dialog_manager):
     await dialog_manager.start(help.HelpStates.MAIN)
 
 
-@router.message(Command('restoreschedules'))
-async def restore_schedules(message: Message, dialog_manager: DialogManager, notifications):
-    logger.info(f'разработчик с id {message.from_user.id} решил восстановить отправки по времени')
+@router.message(Command("restoreschedules"))
+async def restore_schedules(
+    message: Message, dialog_manager: DialogManager, notifications
+):
+    logger.info(
+        f"разработчик с id {message.from_user.id} решил восстановить отправки по времени"
+    )
     await notifications.restore_id_task(dialog_manager)
-    await message.answer('все отправки восстановлены')
+    await message.answer("все отправки восстановлены")
 
 
 @router.error(ExceptionTypeFilter(DataProcessError))
 async def on_data_process_error(error: ErrorEvent, bot: Bot):
     chat_id, user_id = get_ids(error)
 
-    await bot.send_message(chat_id, f'при обработке данных, полученных с сервера произошла ошибка {error.exception}')
-    logger.error(f'у пользователя c id {user_id} произошла ошибка обработки данных', exc_info=error.exception)
+    await bot.send_message(
+        chat_id,
+        f"при обработке данных, полученных с сервера произошла ошибка {error.exception}",
+    )
+    logger.error(
+        f"у пользователя c id {user_id} произошла ошибка обработки данных",
+        exc_info=error.exception,
+    )
 
 
 def get_ids(error):
@@ -154,10 +221,15 @@ async def on_register_error(error: ErrorEvent, bot: Bot):
     chat_id, user_id = get_ids(error)
     exception: RegisterError = error.exception
 
-    await bot.send_message(chat_id, f'при регистрации произошла ошибка {exception}')
+    await bot.send_message(chat_id, f"при регистрации произошла ошибка {exception}")
     if exception.login is not None and exception.password is not None:
-        await bot.send_message(chat_id, f'твой логин {exception.login} и пароль {exception.password}')
-    logger.error(f'у пользователя c id {user_id} произошла ошибка регистрации', exc_info=exception)
+        await bot.send_message(
+            chat_id, f"твой логин {exception.login} и пароль {exception.password}"
+        )
+    logger.error(
+        f"у пользователя c id {user_id} произошла ошибка регистрации",
+        exc_info=exception,
+    )
 
 
 @router.error()
@@ -165,9 +237,15 @@ async def on_other_error(error: ErrorEvent, bot: Bot):
     chat_id, user_id = get_ids(error)
     exception = error.exception
 
-    error_text = f'{type(exception).__name__}: {exception}'
-    await bot.send_message(chat_id, f'пока я что-то делал, произошла какая-то странная ошибка: {error_text}')
-    logger.error(f'у пользователя c id {user_id} возникла необработанная ошибка', exc_info=exception)
+    error_text = f"{type(exception).__name__}: {exception}"
+    await bot.send_message(
+        chat_id,
+        f"пока я что-то делал, произошла какая-то странная ошибка: {error_text}",
+    )
+    logger.error(
+        f"у пользователя c id {user_id} возникла необработанная ошибка",
+        exc_info=exception,
+    )
 
 
 def register_handlers(dp: Dispatcher, config):
@@ -197,15 +275,17 @@ def register_handlers(dp: Dispatcher, config):
 
 async def set_commands(bot: Bot):
     commands = [
-        BotCommand(command='/start', description='запустить бота'),
-        BotCommand(command='/help', description='помощь, описание всех возможностей'),
-        BotCommand(command='/showmenu', description='показать меню'),
-        BotCommand(command='/settings', description='показать настройки'),
-        BotCommand(command='/grades', description='показать оценки'),
-        BotCommand(command='/notifications', description='показать настройки уведомлений'),
-        BotCommand(command='/resultsgrades', description='показать итоговые оценки'),
-        BotCommand(command='/schedule', description='показать расписание'),
-        BotCommand(command='/timeschedule', description='показать расписание звонков'),
-        BotCommand(command='/inputhomework', description='записать домашку')
+        BotCommand(command="/start", description="запустить бота"),
+        BotCommand(command="/help", description="помощь, описание всех возможностей"),
+        BotCommand(command="/showmenu", description="показать меню"),
+        BotCommand(command="/settings", description="показать настройки"),
+        BotCommand(command="/grades", description="показать оценки"),
+        BotCommand(
+            command="/notifications", description="показать настройки уведомлений"
+        ),
+        BotCommand(command="/resultsgrades", description="показать итоговые оценки"),
+        BotCommand(command="/schedule", description="показать расписание"),
+        BotCommand(command="/timeschedule", description="показать расписание звонков"),
+        BotCommand(command="/inputhomework", description="записать домашку"),
     ]
     await bot.set_my_commands(commands)

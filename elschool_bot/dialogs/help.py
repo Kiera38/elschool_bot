@@ -51,29 +51,38 @@ class HelpStates(StatesGroup):
 
 dialog = Dialog(
     Window(
-        Const('Зачем ты здесь? С чем тебе помочь?'),
-        SwitchTo(Const('возможности бота'), 'capabilities', HelpStates.CAPABILITIES),
-        SwitchTo(Const('регистрация'), 'registration', HelpStates.REGISTRATION),
-        SwitchTo(Const('оценки'), 'grades', HelpStates.GRADES),
-        SwitchTo(Const('расписание'), 'schedule', HelpStates.SCHEDULE),
-        SwitchTo(Const('уведомления'), 'notification', HelpStates.NOTIFICATIONS),
-        SwitchTo(Const('настройки'), 'settings', HelpStates.SETTINGS),
-        SwitchTo(Const('связаться с разработчиком'), 'contacts', HelpStates.CONTACTS),
-        state=HelpStates.MAIN
-    ),
-
-    Window(
-        Const('Этот бот имеет много возможностей.'),
-        SwitchTo(Const('просмотр всех оценок'), 'view_grades', HelpStates.VIEW_GRADES),
-        SwitchTo(Const('просмотр расписания'), 'view_schedule', HelpStates.VIEW_SCHEDULE),
-        SwitchTo(Const('сохранять изменения в расписании'), 'save_edits', HelpStates.SAVE_EDITS),
-        SwitchTo(Const('записывать домашку'), 'view_homework', HelpStates.VIEW_HOMEWORK),
-        SwitchTo(Const('автоматическая отправка'), 'autosend', HelpStates.AUTOSEND),
-        SwitchTo(Const('назад'), 'back', HelpStates.MAIN),
-        state=HelpStates.CAPABILITIES
+        Const("Зачем ты здесь? С чем тебе помочь?"),
+        SwitchTo(Const("возможности бота"), "capabilities", HelpStates.CAPABILITIES),
+        SwitchTo(Const("регистрация"), "registration", HelpStates.REGISTRATION),
+        SwitchTo(Const("оценки"), "grades", HelpStates.GRADES),
+        SwitchTo(Const("расписание"), "schedule", HelpStates.SCHEDULE),
+        SwitchTo(Const("уведомления"), "notification", HelpStates.NOTIFICATIONS),
+        SwitchTo(Const("настройки"), "settings", HelpStates.SETTINGS),
+        SwitchTo(Const("связаться с разработчиком"), "contacts", HelpStates.CONTACTS),
+        state=HelpStates.MAIN,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const("Этот бот имеет много возможностей."),
+        SwitchTo(Const("просмотр всех оценок"), "view_grades", HelpStates.VIEW_GRADES),
+        SwitchTo(
+            Const("просмотр расписания"), "view_schedule", HelpStates.VIEW_SCHEDULE
+        ),
+        SwitchTo(
+            Const("сохранять изменения в расписании"),
+            "save_edits",
+            HelpStates.SAVE_EDITS,
+        ),
+        SwitchTo(
+            Const("записывать домашку"), "view_homework", HelpStates.VIEW_HOMEWORK
+        ),
+        SwitchTo(Const("автоматическая отправка"), "autosend", HelpStates.AUTOSEND),
+        SwitchTo(Const("назад"), "back", HelpStates.MAIN),
+        state=HelpStates.CAPABILITIES,
+    ),
+    Window(
+        Const(
+            textwrap.dedent(
+                """
         Ты можешь в любой момент посмотреть свои оценки за определённую часть года. Получение оценок из elschool работает в несколько раз быстрее сайта. 
         Бот может показывать их в различных вариантах.
         1) Общая статистика оценок.
@@ -83,51 +92,67 @@ dialog = Dialog(
         В любом из этих вариантов бот также показывает подсказки по исправлению. Это список оценок, которые нужно получить, чтобы улучшить свою среднюю оценку.
         
         Также можно посмотреть свои итоговые оценки за определённую часть года или за весь год.
-        ''')),
+        """
+            )
+        ),
         # StaticMedia(path='images/common_statistics.jpg'),
-        StaticMedia(path='images/detail_statistics.png'),
+        StaticMedia(path="images/detail_statistics.png"),
         # StaticMedia(path='images/grades_list.jpg'),
         # StaticMedia(path='images/grades_list_with_changes.jpg'),
         # StaticMedia(path='images/results_grades.png'),
-        SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
-        state=HelpStates.VIEW_GRADES
+        SwitchTo(Const("назад"), "back", HelpStates.CAPABILITIES),
+        state=HelpStates.VIEW_GRADES,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Можно смотреть расписание на любой день. Расписание берётся из elschool и потом добавляются изменения, сохранённые у бота.
         
         Также есть удобная кнопка для просмотра расписания звонков на сегодня. Это также включает подсказку о том, когда закончится урок. Все мы любим смотреть сколько осталось до канца урока.
-        ''')),
-        StaticMedia(path='images/schedule.png'),
+        """
+            )
+        ),
+        StaticMedia(path="images/schedule.png"),
         # StaticMedia(path='images/schedule_and_marks.jpg'),
         # StaticMedia(path='images/schedule_time.png'),
-        SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
-        state=HelpStates.VIEW_SCHEDULE
+        SwitchTo(Const("назад"), "back", HelpStates.CAPABILITIES),
+        state=HelpStates.VIEW_SCHEDULE,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Бывает такое, что присылают изменения в расписании, и расписание из elschool уже неправильное. Бот может сохранить эти изменения у себя.
         Изменения сохраняются сразу для всего класса, так что их указывать может только 1 человеку. Остальные сами узнают об этих изменениях.
         
         Изменения в расписании является эксперементальной функцией. Возможны ошибки в работе. Возможны изменения с обновлениями.
-        ''')),
-        StaticMedia(path='images/edit_schedule.jpg'),
+        """
+            )
+        ),
+        StaticMedia(path="images/edit_schedule.jpg"),
         # StaticMedia(path='images/'),
-        SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
-        state=HelpStates.SAVE_EDITS
+        SwitchTo(Const("назад"), "back", HelpStates.CAPABILITIES),
+        state=HelpStates.SAVE_EDITS,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Забыл домашнее задание? Может вообще не знал? Не беда. Записывай его сюда. Ну а также можешь посмотреть, какую домашку записали другие пользователи из твоего класса.
         Если кто-то спрашивает у тебя что задали - отправляй его ко мне. Сам всё узнает.
-        ''')),
-        StaticMedia(path='images/save_homework.png'),
+        """
+            )
+        ),
+        StaticMedia(path="images/save_homework.png"),
         # StaticMedia(path='images/schedule.png'),
-        SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
-        state=HelpStates.VIEW_HOMEWORK
+        SwitchTo(Const("назад"), "back", HelpStates.CAPABILITIES),
+        state=HelpStates.VIEW_HOMEWORK,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Хочется, чтобы бот сам отправлял тебе всякие данные? Такая возможность тоже есть. Отправлять можно как в определённое время, так и привязанное к расписанию звонков.
         Если кто-то из твоего класса сохранил изменения в расписании, то они также могут прийти к тебе.
         Настроить отправку можно на:
@@ -140,16 +165,19 @@ dialog = Dialog(
         Отправлять можно оценки или расписание.
         
         Сейчас бот может отправлять только в определённое время. Возможность отправлять с привязкой к расписанию звонков появится в ближайшее время.
-        ''')),
+        """
+            )
+        ),
         # StaticMedia(path=''),
         # StaticMedia(path=''),
         # StaticMedia(path=''),
-        SwitchTo(Const('назад'), 'back', HelpStates.CAPABILITIES),
-        state=HelpStates.AUTOSEND
+        SwitchTo(Const("назад"), "back", HelpStates.CAPABILITIES),
+        state=HelpStates.AUTOSEND,
     ),
-
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Для использования большинства функций бота нужна регистрация. 
         
         Для того, чтобы зарегистрироваться нужно нажать на кнопку "настройки" и выбрать пункт "регистрация".
@@ -162,28 +190,35 @@ dialog = Dialog(
         3) Сохранить всё.
         Если какие-то данные не сохранены то бот продолжит работать. Но время от времени, примерно раз в неделю будет спрашивать недостающие данные заново.
         Это связано с тем, что токен регистрации полученный от elschool изменился, и боту нужно получить новый.
-        ''')),
+        """
+            )
+        ),
         # StaticMedia(path=''),
         # StaticMedia(path=''),
         # StaticMedia(path=''),
-        SwitchTo(Const('назад'), 'back', HelpStates.MAIN),
-        state=HelpStates.REGISTRATION
+        SwitchTo(Const("назад"), "back", HelpStates.MAIN),
+        state=HelpStates.REGISTRATION,
     ),
-
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Бот может показывать оценки, поставленные учителем в elschool. Для работы этой функции потребуется регистрация.
         Чтобы посмотреть свои оценки, нужно нажать на кнопку "оценки". Бот получит информацию об оценках и предложит выбрать, как показать.
-        ''')),
-        SwitchTo(Const('статистика'), 'statistics', HelpStates.GRADES_STATISTICS),
-        SwitchTo(Const('список'), 'list', HelpStates.GRADES_LIST),
-        SwitchTo(Const('фильтрация'), 'filters', HelpStates.GRADES_FILTERS),
-        SwitchTo(Const('итоговые оценки'), 'results_grades', HelpStates.RESULTS_GRADES),
-        SwitchTo(Const('назад'), 'back', HelpStates.MAIN),
-        state=HelpStates.GRADES
+        """
+            )
+        ),
+        SwitchTo(Const("статистика"), "statistics", HelpStates.GRADES_STATISTICS),
+        SwitchTo(Const("список"), "list", HelpStates.GRADES_LIST),
+        SwitchTo(Const("фильтрация"), "filters", HelpStates.GRADES_FILTERS),
+        SwitchTo(Const("итоговые оценки"), "results_grades", HelpStates.RESULTS_GRADES),
+        SwitchTo(Const("назад"), "back", HelpStates.MAIN),
+        state=HelpStates.GRADES,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Статистика. 
         в этом варианте бот анализирует оценки и показывает некоторую информацию. Там можно увидеть:
         По какому предмету лучшая и худшая оценка
@@ -199,27 +234,35 @@ dialog = Dialog(
         
         Изначально в этом варианте показывается общая статистика. Если нужна детальная, то нужно нажать на кнопку ">>" или "<<", чтобы сменить страницу на другую.
         Также, нажав на кнопку "общая" или с названием предмета, можно выбрать любой предмет или открыть общую статистику.
-        ''')),
+        """
+            )
+        ),
         # StaticMedia(path='images/grades_statistics_settings.png'),
-        StaticMedia(path='images/common_statistics.jpg'),
+        StaticMedia(path="images/common_statistics.jpg"),
         # StaticMedia(path='images/detail_statistics.png'),
         # StaticMedia(path='images/select_statistics_page.png'),
-        SwitchTo(Const('назад'), 'back', HelpStates.GRADES),
+        SwitchTo(Const("назад"), "back", HelpStates.GRADES),
         state=HelpStates.GRADES_STATISTICS,
-        parse_mode=''
+        parse_mode="",
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Список. 
         Показываются все оценки по всем предметам с учётом настроенных фильтров. Также можно включить подсказки по исправлению.
-        ''')),
+        """
+            )
+        ),
         # StaticMedia(path='images/grades_list_settings.png'),
-        StaticMedia(path='images/grades_list.jpg'),
-        SwitchTo(Const('назад'), 'back', HelpStates.GRADES),
-        state=HelpStates.GRADES_LIST
+        StaticMedia(path="images/grades_list.jpg"),
+        SwitchTo(Const("назад"), "back", HelpStates.GRADES),
+        state=HelpStates.GRADES_LIST,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Также можно фильтровать оценки. Так не будут показываться некоторые оценки, которые не хочется видеть.
         
         Доступные фильтры:
@@ -237,38 +280,59 @@ dialog = Dialog(
         
         Сами оценки. 
         Можно например показывать только 4 или 4 и 5.
-        ''')),
-        StaticMedia(path='images/grades_statistics_settings.png'),
+        """
+            )
+        ),
+        StaticMedia(path="images/grades_statistics_settings.png"),
         # StaticMedia(path='images/select_lessons_list_grades.png'),
-        SwitchTo(Const('назад'), 'back', HelpStates.GRADES),
-        state=HelpStates.GRADES_FILTERS
+        SwitchTo(Const("назад"), "back", HelpStates.GRADES),
+        state=HelpStates.GRADES_FILTERS,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Итоговые оценки.
         Бот может показать итоговые оценки за часть года и год. Для этого нужно нажать на кнопку "итоговые оценки".
         В этом сообщении также будет количество оценок.
-        ''')),
-        StaticMedia(path='images/results_grades.jpg'),
-        SwitchTo(Const('назад'), 'back', HelpStates.GRADES),
-        state=HelpStates.RESULTS_GRADES
+        """
+            )
+        ),
+        StaticMedia(path="images/results_grades.jpg"),
+        SwitchTo(Const("назад"), "back", HelpStates.GRADES),
+        state=HelpStates.RESULTS_GRADES,
     ),
-
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Бот может показывать расписание на любой день. Для этого нужна регистрация.
         Чтобы посмотреть расписание, нужно нажать на кнопку "расписание".
         Бот предложит выбрать день в календаре. можно выбрать любой день, месяц, год.
         После этого бот получит необходимую информацию и покажет расписание.
-        ''')),
-        SwitchTo(Const('изменения в расписании'), 'schedule_changes', HelpStates.SCHEDULE_CHANGES),
-        SwitchTo(Const('стандартные изменения'), 'default_schedule_changes', HelpStates.DEFAULT_SCHEDULE_CHANGES),
-        SwitchTo(Const('Удобные кнопки'), 'schedule_buttons', HelpStates.SCHEDULE_BUTTONS),
-        SwitchTo(Const('назад'), 'back', HelpStates.MAIN),
-        state=HelpStates.SCHEDULE
+        """
+            )
+        ),
+        SwitchTo(
+            Const("изменения в расписании"),
+            "schedule_changes",
+            HelpStates.SCHEDULE_CHANGES,
+        ),
+        SwitchTo(
+            Const("стандартные изменения"),
+            "default_schedule_changes",
+            HelpStates.DEFAULT_SCHEDULE_CHANGES,
+        ),
+        SwitchTo(
+            Const("Удобные кнопки"), "schedule_buttons", HelpStates.SCHEDULE_BUTTONS
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.MAIN),
+        state=HelpStates.SCHEDULE,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Бывает такое, что присылают изменения в расписании. В таком случае расписание из elschool становится неправильным.
         Бот позволяет указывать изменения. Эти изменения сохраняются для всего класса.
         
@@ -281,61 +345,93 @@ dialog = Dialog(
         
         ВНИМАНИЕ! Сделав неправильные изменения ты подставляешь весь свой класс. Пожалуйста указывайте только правильные изменения. 
         Изменения в расписании является экспериментальной возможностью. Возможны ошибки в работе.
-        ''')),
-        StaticMedia(path='images/edit_schedule.jpg'),
+        """
+            )
+        ),
+        StaticMedia(path="images/edit_schedule.jpg"),
         # StaticMedia(path=''),
-        SwitchTo(Const('назад'), 'back', HelpStates.SCHEDULE),
-        state=HelpStates.SCHEDULE_CHANGES
+        SwitchTo(Const("назад"), "back", HelpStates.SCHEDULE),
+        state=HelpStates.SCHEDULE_CHANGES,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Иногда в elschool что-то всегда неправильное. Для таких случаев нужны стандартные изменения. Такие изменения работают для любого дня.
         Чтобы их указать нужно нажать на кнопку "стандартные изменения", которая находится под выбором дня.
         После этого выбираешь любой день недели и изменяешь.
         
         ВНИМАНИЕ! Сделав неправильные изменения ты подставляешь весь свой класс. Пожалуйста указывайте только правильные изменения. 
         Изменения в расписании является экспериментальной возможностью. Возможны ошибки в работе. Реализация изменится в будущей версии.
-        ''')),
-        StaticMedia(path='images/default_changes_day.png'),
+        """
+            )
+        ),
+        StaticMedia(path="images/default_changes_day.png"),
         # StaticMedia(path='images/edit_schedule.jpg'),
         # StaticMedia(path=''),
-        SwitchTo(Const('назад'), 'back', HelpStates.SCHEDULE),
-        state=HelpStates.DEFAULT_SCHEDULE_CHANGES
+        SwitchTo(Const("назад"), "back", HelpStates.SCHEDULE),
+        state=HelpStates.DEFAULT_SCHEDULE_CHANGES,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Удобные кнопки:
         Расписание звонков. 
         Позволяет быстро увидеть расписание звонков на сегодня. Также подсказывает когда закончится урок.
         
         Записать домашку. 
         позволяет записать домашку на следующий урок. выбор из тех уроков, которые были сегодня.
-        ''')),
+        """
+            )
+        ),
         # StaticMedia(path='images/schedule_time.png'),
         # StaticMedia(path='images/save_homework.png'),
-        SwitchTo(Const('назад'), 'back', HelpStates.SCHEDULE),
-        state=HelpStates.SCHEDULE_BUTTONS
+        SwitchTo(Const("назад"), "back", HelpStates.SCHEDULE),
+        state=HelpStates.SCHEDULE_BUTTONS,
     ),
-
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Бот может сам отправлять сообщения с различной информацией. 
         Чтобы это настроить, нужно нажать на кнопку "уведомления".
-        ''')),
-        StaticMedia(path='images/notifications.png'),
-        SwitchTo(Const('автоматическая отправка оценок'), 'autosend_grades', HelpStates.AUTOSEND_GRADES),
-        SwitchTo(Const('отправлять расписание'), 'autosend_schedule', HelpStates.AUTOSEND_SCHEDULE),
-        SwitchTo(Const('Отправлять расписание при изменениях'), 'notify_schedule_changes',
-                 HelpStates.NOTIFY_SCHEDULE_CHANGE),
-        SwitchTo(Const('Отправлять перед уроком'), 'start_lesson', HelpStates.START_LESSON),
-        SwitchTo(Const('Отправлять после урока'), 'end_lesson', HelpStates.END_LESSON),
-        SwitchTo(Const('Отправлять перед уроками'), 'start_lessons', HelpStates.START_LESSONS),
-        SwitchTo(Const('Отправлять после уроков'), 'end_lessons', HelpStates.END_LESSONS),
-        SwitchTo(Const('назад'), 'back', HelpStates.MAIN),
-        state=HelpStates.NOTIFICATIONS
+        """
+            )
+        ),
+        StaticMedia(path="images/notifications.png"),
+        SwitchTo(
+            Const("автоматическая отправка оценок"),
+            "autosend_grades",
+            HelpStates.AUTOSEND_GRADES,
+        ),
+        SwitchTo(
+            Const("отправлять расписание"),
+            "autosend_schedule",
+            HelpStates.AUTOSEND_SCHEDULE,
+        ),
+        SwitchTo(
+            Const("Отправлять расписание при изменениях"),
+            "notify_schedule_changes",
+            HelpStates.NOTIFY_SCHEDULE_CHANGE,
+        ),
+        SwitchTo(
+            Const("Отправлять перед уроком"), "start_lesson", HelpStates.START_LESSON
+        ),
+        SwitchTo(Const("Отправлять после урока"), "end_lesson", HelpStates.END_LESSON),
+        SwitchTo(
+            Const("Отправлять перед уроками"), "start_lessons", HelpStates.START_LESSONS
+        ),
+        SwitchTo(
+            Const("Отправлять после уроков"), "end_lessons", HelpStates.END_LESSONS
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.MAIN),
+        state=HelpStates.NOTIFICATIONS,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Автоматическая отправка оценок. Бот будет сам отправлять оценки в определённое время. Можно настроить неограниченное количество таких отправок.
         
         Для этого нужно нажать на кнопку "новая отправка" и настроить как и когда показывать оценки. 
@@ -348,151 +444,219 @@ dialog = Dialog(
         показывать.
         Позволяет указать когда стоит показывать сообщение с оценками.
         Там можно настроить время, когда отправиться сообщение, а также как часто нужно присылать повторно с новыми данными.
-        ''')),
-        StaticMedia(path='images/autosend_grades_settings.png'),
+        """
+            )
+        ),
+        StaticMedia(path="images/autosend_grades_settings.png"),
         # StaticMedia(path='images/select_autosend_time.png'),
-        SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
-        state=HelpStates.AUTOSEND_GRADES
+        SwitchTo(Const("назад"), "back", HelpStates.NOTIFICATIONS),
+        state=HelpStates.AUTOSEND_GRADES,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Отправлять расписание. 
         Автоматически отправлять расписание на следующий день в определённое время. Можно указать время, и как часто нужно присылать повторно с новыми данными.
-        ''')),
-        StaticMedia(path='images/select_autosend_schedule_time.png'),
-        SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
-        state=HelpStates.AUTOSEND_SCHEDULE
+        """
+            )
+        ),
+        StaticMedia(path="images/select_autosend_schedule_time.png"),
+        SwitchTo(Const("назад"), "back", HelpStates.NOTIFICATIONS),
+        state=HelpStates.AUTOSEND_SCHEDULE,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Отправлять расписание при изменениях. 
         Когда кто-то из твоего класса сохранил изменения расписание, отправить новое расписание тебе.
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
-        state=HelpStates.NOTIFY_SCHEDULE_CHANGE
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.NOTIFICATIONS),
+        state=HelpStates.NOTIFY_SCHEDULE_CHANGE,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Отправлять перед уроком. 
         отправить различную информацию об уроке перед его началом.
         
         Скоро
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
-        state=HelpStates.START_LESSON
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.NOTIFICATIONS),
+        state=HelpStates.START_LESSON,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Отправлять после урока. 
         отправить различную информацию об уроке после его окончания.
         
         Скоро
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
-        state=HelpStates.END_LESSON
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.NOTIFICATIONS),
+        state=HelpStates.END_LESSON,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Отправлять перед уроками. 
         отправить различную информацию обо всех уроках перед началом.
         
         Скоро
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
-        state=HelpStates.START_LESSONS
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.NOTIFICATIONS),
+        state=HelpStates.START_LESSONS,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Отправлять после уроков. 
         отправить различную информацию обо всех уроках после окончания.
         
         Скоро
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.NOTIFICATIONS),
-        state=HelpStates.END_LESSONS
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.NOTIFICATIONS),
+        state=HelpStates.END_LESSONS,
     ),
-
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         При нажатии на кнопку "настройки" открываются различные настройки бота.
         Если ты не зарегистрирован, то будет кнопка "регистрация", а если зарегистрирован, то кнопки "изменить данные" и "удалить данные".
         Остальные кнопки показываются всегда.
-        ''')),
-        StaticMedia(path='images/settings.png'),
-        SwitchTo(Const('регистрация'), 'register', HelpStates.REGISTER),
-        SwitchTo(Const('изменить данные'), 'change_data', HelpStates.CHANGE_DATA),
-        SwitchTo(Const('удалить данные'), 'remove_data', HelpStates.REMOVE_DATA),
-        SwitchTo(Const('версия'), 'version', HelpStates.VERSION),
-        SwitchTo(Const('политика конфиденциальности'), 'privacy_policy', HelpStates.PRIVACY_POLICY),
-        SwitchTo(Const('часть года'), 'change_quarter', HelpStates.CHANGE_QUARTER),
-        SwitchTo(Const('время кеширования'), 'change_cache_time', HelpStates.CHANGE_CACHE_TIME),
-        SwitchTo(Const('назад'), 'back', HelpStates.MAIN),
-        state=HelpStates.SETTINGS
+        """
+            )
+        ),
+        StaticMedia(path="images/settings.png"),
+        SwitchTo(Const("регистрация"), "register", HelpStates.REGISTER),
+        SwitchTo(Const("изменить данные"), "change_data", HelpStates.CHANGE_DATA),
+        SwitchTo(Const("удалить данные"), "remove_data", HelpStates.REMOVE_DATA),
+        SwitchTo(Const("версия"), "version", HelpStates.VERSION),
+        SwitchTo(
+            Const("политика конфиденциальности"),
+            "privacy_policy",
+            HelpStates.PRIVACY_POLICY,
+        ),
+        SwitchTo(Const("часть года"), "change_quarter", HelpStates.CHANGE_QUARTER),
+        SwitchTo(
+            Const("время кеширования"),
+            "change_cache_time",
+            HelpStates.CHANGE_CACHE_TIME,
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.MAIN),
+        state=HelpStates.SETTINGS,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Регистрация. 
         Позволяет зарегистрироваться. Без этого многие возможности не будут работать. Для более подробной информации передите к разделу "регистрация" в основном меню помощи
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
-        state=HelpStates.REGISTER
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.SETTINGS),
+        state=HelpStates.REGISTER,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Изменить данные. 
         Позволяет изменять данные регистрации. Если некоторых данных недостаточно бот может спросить их. Такие данные сохраняться не будут. Они нужны только для проверки новых .
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
-        state=HelpStates.CHANGE_DATA
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.SETTINGS),
+        state=HelpStates.CHANGE_DATA,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Удалить данные. 
         Удаляет данные регистрации. Можно удалять частично, а можно полностью. "Удалить все" удаляет только логин и пароль. "Удалить полностью" удаляет все данные о тебе.
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
-        state=HelpStates.REMOVE_DATA
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.SETTINGS),
+        state=HelpStates.REMOVE_DATA,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Версия. 
         Номер текущей версии бота. Список изменений в обновлениях.
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
-        state=HelpStates.VERSION
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.SETTINGS),
+        state=HelpStates.VERSION,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Политика конфиденциальности. 
         Рассказывает какие данные хранятся.
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
-        state=HelpStates.PRIVACY_POLICY
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.SETTINGS),
+        state=HelpStates.PRIVACY_POLICY,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         часть года. 
         Позволяет выбрать текущую часть года. Это нужно при получении оценок. Когда бот получает оценки, он использует эту настройку, чтобы показывать тоько актуальные оценки.
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
-        state=HelpStates.CHANGE_QUARTER
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.SETTINGS),
+        state=HelpStates.CHANGE_QUARTER,
     ),
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Время кеширования. 
         Информация, полученная с сервера кешируется, чтобы не нагружать сервер лишними запросами. Эта настройка позволяет указать максимальное время хранения в кеше.
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.SETTINGS),
-        state=HelpStates.CHANGE_CACHE_TIME
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.SETTINGS),
+        state=HelpStates.CHANGE_CACHE_TIME,
     ),
-
     Window(
-        Const(textwrap.dedent('''
+        Const(
+            textwrap.dedent(
+                """
         Нашли ошибку? А может есть предложение по улучшению? Вы всегда можете написать разработчику @izrupy.
         
         Канал с новостями и другой важной информацией @elschoolbotnews.
-        ''')),
-        SwitchTo(Const('назад'), 'back', HelpStates.MAIN),
-        state=HelpStates.CONTACTS
-    )
+        """
+            )
+        ),
+        SwitchTo(Const("назад"), "back", HelpStates.MAIN),
+        state=HelpStates.CONTACTS,
+    ),
 )

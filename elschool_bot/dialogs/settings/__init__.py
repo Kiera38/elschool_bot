@@ -22,41 +22,46 @@ class States(StatesGroup):
 async def on_result(data, result_data, manager: DialogManager):
     if result_data is None:
         return
-    if manager.dialog_data.get('register'):
-        del manager.dialog_data['register']
+    if manager.dialog_data.get("register"):
+        del manager.dialog_data["register"]
         await register.register(result_data, manager)
         return
-    if manager.dialog_data.get('change_data'):
-        del manager.dialog_data['change_data']
+    if manager.dialog_data.get("change_data"):
+        del manager.dialog_data["change_data"]
         await change_data.update_no_data(result_data, manager)
         return
-    status.set(manager, result_data.get('status', 'настройки'))
+    status.set(manager, result_data.get("status", "настройки"))
 
 
 async def on_start(start_data, manager: DialogManager):
-    status.set(manager, 'настройки')
+    status.set(manager, "настройки")
 
 
 async def get_data(repo: Repo, event_from_user: User, **kwargs):
-    return {
-        'registered': await repo.has_user(event_from_user.id)
-    }
+    return {"registered": await repo.has_user(event_from_user.id)}
 
 
 async def on_edit_data(query: CallbackQuery, button, manager: DialogManager):
-    repo = manager.middleware_data['repo']
+    repo = manager.middleware_data["repo"]
     login, password = await repo.get_user_data(query.from_user.id)
     if login is not None and password is not None:
         await manager.start(ChangeDataStates.HAS_ALL_DATA)
     elif login is not None:
-        await manager.start(ChangeDataStates.HAS_DATA, {'has_type': 'логин', 'no_type': 'пароль'})
+        await manager.start(
+            ChangeDataStates.HAS_DATA, {"has_type": "логин", "no_type": "пароль"}
+        )
     elif password is not None:
-        await manager.start(ChangeDataStates.HAS_DATA, {'has_type': 'пароль', 'no_type': 'логин'})
+        await manager.start(
+            ChangeDataStates.HAS_DATA, {"has_type": "пароль", "no_type": "логин"}
+        )
     else:
-        manager.dialog_data['change_data'] = True
-        await input_data.start(('логин', 'пароль'),
-                               ('у меня нет твоих данных, чтобы изменить нужно ввести все.', ''),
-                               manager, ('', ''))
+        manager.dialog_data["change_data"] = True
+        await input_data.start(
+            ("логин", "пароль"),
+            ("у меня нет твоих данных, чтобы изменить нужно ввести все.", ""),
+            manager,
+            ("", ""),
+        )
 
 
 async def on_delete_data(query: CallbackQuery, button, manager: DialogManager):
@@ -64,15 +69,20 @@ async def on_delete_data(query: CallbackQuery, button, manager: DialogManager):
 
 
 async def on_privacy_policy(query, button, manager: DialogManager):
-    await status.update(manager, "Для получения оценок бот использует логин и пароль от журнала elschool. "
-                                 "Эти данные используются только для получения токена. "
-                                 "Этот токен используется для получения оценок. "
-                                 "Есть возможность сохранить данные от аккаунта elschool. "
-                                 "Разработчик гарантирует, что данные никто смотреть не будет.")
+    await status.update(
+        manager,
+        "Для получения оценок бот использует логин и пароль от журнала elschool. "
+        "Эти данные используются только для получения токена. "
+        "Этот токен используется для получения оценок. "
+        "Есть возможность сохранить данные от аккаунта elschool. "
+        "Разработчик гарантирует, что данные никто смотреть не будет.",
+    )
 
 
 async def on_version(query, button, manager: DialogManager):
-    await status.update(manager, '''моя версия: 3.3.1.dev15
+    await status.update(
+        manager,
+        """моя версия: 3.3.1.dev15
 
 Список изменений:
 в 3.3.1:
@@ -131,36 +141,42 @@ async def on_version(query, button, manager: DialogManager):
 
 Исправленные ошибки:
 Исправлено множество ошибок из старых версий. Улучшена обработка ошибок elschool.
-''')
+""",
+    )
 
 
 async def on_change_quarter(query, button, manager: DialogManager):
-    status.set(manager, 'получение данных', quarters=[])
+    status.set(manager, "получение данных", quarters=[])
     await manager.switch_to(States.GET_QUARTER_DATA)
     await manager.show()
-    repo = manager.middleware_data['repo']
+    repo = manager.middleware_data["repo"]
     quarters = await repo.get_quarters(query.from_user.id)
-    await status.update(manager, 'выбери 1 из вариантов', quarters=quarters)
+    await status.update(manager, "выбери 1 из вариантов", quarters=quarters)
 
 
 async def on_quarter_select(query, select, manager: DialogManager, quarter):
-    repo = manager.middleware_data['repo']
+    repo = manager.middleware_data["repo"]
     await repo.update_quarter(query.from_user.id, quarter)
-    status.set(manager, f'часть года изменена на {quarter}')
+    status.set(manager, f"часть года изменена на {quarter}")
     await manager.switch_to(States.MAIN)
 
 
 async def on_register(query, button, manager: DialogManager):
-    manager.dialog_data['register'] = True
-    await input_data.start(('логин', 'пароль'), ('Начнём регистрацию.', ''), manager,
-                           ('', ''), check_get_grades=True)
+    manager.dialog_data["register"] = True
+    await input_data.start(
+        ("логин", "пароль"),
+        ("Начнём регистрацию.", ""),
+        manager,
+        ("", ""),
+        check_get_grades=True,
+    )
 
 
 async def on_input_cache_time(message, widget, manager: DialogManager, text: str):
     text = text.split()
     try:
         if len(text) == 1:
-            text = text[0].split(':')
+            text = text[0].split(":")
             if len(text) == 1:
                 seconds = int(text[0])
             elif len(text) == 2:
@@ -171,78 +187,98 @@ async def on_input_cache_time(message, widget, manager: DialogManager, text: str
                 minutes = int(text[1]) + hours * 60
                 seconds = int(text[2]) + minutes * 60
             else:
-                status.set(manager, 'сохранять оценки на несколько дней это слишком много. '
-                                    'Я должен показывать все изменения.')
+                status.set(
+                    manager,
+                    "сохранять оценки на несколько дней это слишком много. "
+                    "Я должен показывать все изменения.",
+                )
                 await manager.switch_to(States.MAIN)
                 return
         elif len(text) % 2 == 0:
             seconds = 0
             for text1, text2 in zip(text[::2], text[1::2]):
-                if text2 in ('секунда', 'секунд'):
+                if text2 in ("секунда", "секунд"):
                     seconds += int(text1)
-                elif text2 in ('минута', 'минут'):
+                elif text2 in ("минута", "минут"):
                     seconds += int(text1) * 60
-                elif text2 in ('час', 'часов'):
+                elif text2 in ("час", "часов"):
                     seconds += int(text1) * 3600
                 else:
-                    status.set(manager, 'я не могу сохранять оценки на такое время.')
+                    status.set(manager, "я не могу сохранять оценки на такое время.")
                     await manager.switch_to(States.MAIN)
                     return
         else:
-            status.set(manager, 'я не могу сохранять оценки на такое время.')
+            status.set(manager, "я не могу сохранять оценки на такое время.")
             await manager.switch_to(States.MAIN)
             return
     except ValueError:
-        status.set(manager, 'какое-то странное время ты написал. Я не могу понять. '
-                            'Где-то вместо числа написано что-то, не похожее на число.')
+        status.set(
+            manager,
+            "какое-то странное время ты написал. Я не могу понять. "
+            "Где-то вместо числа написано что-то, не похожее на число.",
+        )
         await manager.switch_to(States.MAIN)
         return
-    repo: Repo = manager.middleware_data['repo']
+    repo: Repo = manager.middleware_data["repo"]
     await repo.set_cache_time(message.from_user.id, seconds)
 
 
 dialog = Dialog(
     Window(
         status.create_status_widget(),
-        Button(Const('регистрация'), 'register', on_register, when=~F['registered']),
+        Button(Const("регистрация"), "register", on_register, when=~F["registered"]),
         Row(
-            Button(Const('изменить данные'), 'edit_data', on_edit_data),
-            Button(Const('удалить данные', ), 'delete_data', on_click=on_delete_data),
-            when='registered'
+            Button(Const("изменить данные"), "edit_data", on_edit_data),
+            Button(
+                Const(
+                    "удалить данные",
+                ),
+                "delete_data",
+                on_click=on_delete_data,
+            ),
+            when="registered",
         ),
         Row(
-            Button(Const('версия'), 'version', on_click=on_version),
-            Button(Const('политика конфиденциальности'), 'privacy_policy', on_privacy_policy),
+            Button(Const("версия"), "version", on_click=on_version),
+            Button(
+                Const("политика конфиденциальности"),
+                "privacy_policy",
+                on_privacy_policy,
+            ),
         ),
         Row(
-            Button(Const('часть года'), 'change_quarter', on_click=on_change_quarter),
-            SwitchTo(Const('время кеширования'), 'change_cache_time', States.EDIT_CACHE_TIME)
+            Button(Const("часть года"), "change_quarter", on_click=on_change_quarter),
+            SwitchTo(
+                Const("время кеширования"), "change_cache_time", States.EDIT_CACHE_TIME
+            ),
         ),
-        state=States.MAIN
+        state=States.MAIN,
     ),
     Window(
-        Format('{dialog_data[status]}'),
+        Format("{dialog_data[status]}"),
         Select(
-            Format('{item}'),
-            'select_quarter',
+            Format("{item}"),
+            "select_quarter",
             lambda item: item,
-            F['dialog_data']['quarters'],
-            on_click=on_quarter_select
+            F["dialog_data"]["quarters"],
+            on_click=on_quarter_select,
         ),
-        state=States.GET_QUARTER_DATA
+        state=States.GET_QUARTER_DATA,
     ),
     Window(
-        Const('Чтобы не мучать постоянными запросами сервер elschool, я на некоторое время сохраняю оценки. '
-              'Сейчас ты можешь написать мне время, которое я не буду обновлять твои оценки '
-              'после предыдущего получения. Стандартное время 1 час. '
-              'Можно писать по разному. Например 20 минут 10 секунд или 20:10 или 21 минута или 1200 секунд.'),
-        TextInput('cache_time', on_success=on_input_cache_time),
-        SwitchTo(Const('отмена'), 'cancel_cache_time', States.MAIN),
-        state=States.EDIT_CACHE_TIME
+        Const(
+            "Чтобы не мучать постоянными запросами сервер elschool, я на некоторое время сохраняю оценки. "
+            "Сейчас ты можешь написать мне время, которое я не буду обновлять твои оценки "
+            "после предыдущего получения. Стандартное время 1 час. "
+            "Можно писать по разному. Например 20 минут 10 секунд или 20:10 или 21 минута или 1200 секунд."
+        ),
+        TextInput("cache_time", on_success=on_input_cache_time),
+        SwitchTo(Const("отмена"), "cancel_cache_time", States.MAIN),
+        state=States.EDIT_CACHE_TIME,
     ),
     on_process_result=on_result,
     getter=get_data,
-    on_start=on_start
+    on_start=on_start,
 )
 
 

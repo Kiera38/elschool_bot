@@ -18,74 +18,82 @@ class ChangeDataStates(StatesGroup):
 
 async def start_one_change(input_type, no_type, manager: DialogManager):
     if no_type is None or no_type == input_type:
-        manager.dialog_data['need_save'] = 'логин', 'пароль'
-        repo = manager.middleware_data['repo']
-        if input_type == 'логин':
+        manager.dialog_data["need_save"] = "логин", "пароль"
+        repo = manager.middleware_data["repo"]
+        if input_type == "логин":
             _, value = await repo.get_user_data(manager.event.from_user.id)
         else:
             value, _ = await repo.get_user_data(manager.event.from_user.id)
-        await input_data.start((input_type,), ('',), manager, value=value)
+        await input_data.start((input_type,), ("",), manager, value=value)
     else:
-        manager.dialog_data['need_save'] = input_type,
-        await input_data.start((input_type, no_type),
-                               ('', f'хорошо, но у меня не сохранён твой {no_type}. '
-                                    f'Для того, чтобы проверить твой новый {input_type} мне нужен, твой {no_type}'
-                                    f'Я не буду его сохранять'), manager)
+        manager.dialog_data["need_save"] = (input_type,)
+        await input_data.start(
+            (input_type, no_type),
+            (
+                "",
+                f"хорошо, но у меня не сохранён твой {no_type}. "
+                f"Для того, чтобы проверить твой новый {input_type} мне нужен, твой {no_type}"
+                f"Я не буду его сохранять",
+            ),
+            manager,
+        )
 
 
 async def on_change_login_all_data(query, button, manager: DialogManager):
-    await start_one_change('логин', None, manager)
+    await start_one_change("логин", None, manager)
 
 
 async def on_change_password_all_data(query, button, manager: DialogManager):
-    await start_one_change('пароль', None, manager)
+    await start_one_change("пароль", None, manager)
 
 
 async def on_change_login(query, button, manager: DialogManager):
-    await start_one_change('логин', manager.start_data['no_type'], manager)
+    await start_one_change("логин", manager.start_data["no_type"], manager)
 
 
 async def on_change_password(query, button, manager: DialogManager):
-    await start_one_change('пароль', manager.start_data['no_type'], manager)
+    await start_one_change("пароль", manager.start_data["no_type"], manager)
 
 
-async def on_select_save_data(query: CallbackQuery, select, manager: DialogManager, selected_item):
+async def on_select_save_data(
+    query: CallbackQuery, select, manager: DialogManager, selected_item
+):
     user_id = query.from_user.id
-    repo: Repo = manager.middleware_data['repo']
-    jwtoken = manager.start_data['jwtoken']
-    login = manager.start_data['login']
-    password = manager.start_data['password']
-    if selected_item == 'не сохранить':
+    repo: Repo = manager.middleware_data["repo"]
+    jwtoken = manager.start_data["jwtoken"]
+    login = manager.start_data["login"]
+    password = manager.start_data["password"]
+    if selected_item == "не сохранить":
         await repo.update_data(user_id, jwtoken)
-    elif selected_item == 'только логин':
+    elif selected_item == "только логин":
         await repo.update_data(user_id, jwtoken, login)
-    elif selected_item == 'только пароль':
+    elif selected_item == "только пароль":
         await repo.update_data(user_id, jwtoken, password=password)
     else:
         await repo.update_data(user_id, jwtoken, login, password)
-    status.set(manager, 'изменение данных завершено', cancel_text='в настройки')
+    status.set(manager, "изменение данных завершено", cancel_text="в настройки")
     await manager.next()
 
 
 async def on_process_result(start_data, data, manager: DialogManager):
-    need_save = manager.dialog_data['need_save']
-    repo: Repo = manager.middleware_data['repo']
-    jwtoken = data['jwtoken']
-    login = data['login']
-    password = data['password']
+    need_save = manager.dialog_data["need_save"]
+    repo: Repo = manager.middleware_data["repo"]
+    jwtoken = data["jwtoken"]
+    login = data["login"]
+    password = data["password"]
     if len(need_save) == 2:
         await repo.update_data(manager.event.from_user.id, jwtoken, login, password)
-    elif need_save[0] == 'логин':
+    elif need_save[0] == "логин":
         await repo.update_data(manager.event.from_user.id, jwtoken, login)
     else:
         await repo.update_data(manager.event.from_user.id, jwtoken, password=password)
-    status.set(manager, 'изменение данных завершено', cancel_text='в настройки')
+    status.set(manager, "изменение данных завершено", cancel_text="в настройки")
     await manager.switch_to(ChangeDataStates.STATUS)
 
 
 async def on_change_all(query, button, manager: DialogManager):
-    manager.dialog_data['need_save'] = 'логин', 'пароль'
-    await input_data.start(('логин', 'пароль'), ('', ''), manager)
+    manager.dialog_data["need_save"] = "логин", "пароль"
+    await input_data.start(("логин", "пароль"), ("", ""), manager)
 
 
 async def update_no_data(data, manager: DialogManager):
@@ -94,42 +102,46 @@ async def update_no_data(data, manager: DialogManager):
 
 dialog = Dialog(
     Window(
-        Const('у меня есть все твои данные, выбери какие хочешь изменить'),
+        Const("у меня есть все твои данные, выбери какие хочешь изменить"),
         Row(
-            Button(Const('логин'), 'change_login', on_change_login_all_data),
-            Button(Const('пароль'), 'change_password', on_change_password_all_data),
-            Button(Const('всё'), 'change_all', on_change_all)
+            Button(Const("логин"), "change_login", on_change_login_all_data),
+            Button(Const("пароль"), "change_password", on_change_password_all_data),
+            Button(Const("всё"), "change_all", on_change_all),
         ),
-        Cancel(Const('отмена')),
-        state=ChangeDataStates.HAS_ALL_DATA
+        Cancel(Const("отмена")),
+        state=ChangeDataStates.HAS_ALL_DATA,
     ),
     Window(
-        Format('у меня есть только {start_data[has_type]}, выбери что хочешь изменить'),
+        Format("у меня есть только {start_data[has_type]}, выбери что хочешь изменить"),
         Row(
-            Button(Const('логин'), 'change_login', on_change_login),
-            Button(Const('пароль'), 'change_password', on_change_password),
-            Button(Const('всё'), 'change_all', on_change_all)
+            Button(Const("логин"), "change_login", on_change_login),
+            Button(Const("пароль"), "change_password", on_change_password),
+            Button(Const("всё"), "change_all", on_change_all),
         ),
-        Cancel(Const('отмена')),
-        state=ChangeDataStates.HAS_DATA
+        Cancel(Const("отмена")),
+        state=ChangeDataStates.HAS_DATA,
     ),
     Window(
-        Const('Обычно я получаю всю информацию по токену, но elschool раз в неделю обновляет его. '
-              'Чтобы я мог его обновить автоматически, мне нужно сохранить твои данные у себя. '
-              'Ты можешь мне запретить сохранять данные. В этом случае при обновлении токена, я спрошу их снова. '
-              'Этот параметр можно в будущем изменить.'),
+        Const(
+            "Обычно я получаю всю информацию по токену, но elschool раз в неделю обновляет его. "
+            "Чтобы я мог его обновить автоматически, мне нужно сохранить твои данные у себя. "
+            "Ты можешь мне запретить сохранять данные. В этом случае при обновлении токена, я спрошу их снова. "
+            "Этот параметр можно в будущем изменить."
+        ),
         Group(
             Select(
-                Format('{item}'),
-                'select_save_data',
+                Format("{item}"),
+                "select_save_data",
                 lambda i: i,
-                ['сохранить всё', 'не сохранить', 'только логин', 'только пароль'],
-                on_click=on_select_save_data
+                ["сохранить всё", "не сохранить", "только логин", "только пароль"],
+                on_click=on_select_save_data,
             ),
-            width=2
+            width=2,
         ),
-        state=ChangeDataStates.CHECK_SAVE_DATA
+        state=ChangeDataStates.CHECK_SAVE_DATA,
     ),
-    status.create(ChangeDataStates.STATUS, Cancel(Format('{dialog_data[cancel_text]}'))),
-    on_process_result=on_process_result
+    status.create(
+        ChangeDataStates.STATUS, Cancel(Format("{dialog_data[cancel_text]}"))
+    ),
+    on_process_result=on_process_result,
 )

@@ -4,10 +4,10 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "elschool_bot"
-version = "3.3.1.dev15"
+version = "4.0.0.dev0"
 description = "бот для телегамма котрый показывает оценки из elschool и помогает учиться"
 dependencies = [
-    "aiogram>=3.0.0",
+    "aiogram>=3.2.0",
     "aiogram-dialog>=2.0.0",
     "beautifulsoup4",
     "aiohttp",

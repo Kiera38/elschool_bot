@@ -1,5 +1,4 @@
 import itertools
-import datetime
 
 from aiogram import F
 from aiogram.fsm.state import StatesGroup, State
@@ -44,7 +43,7 @@ def filter_grades(grades, filters, value_filters):
 
 
 def mean_mark(marks):
-    values = [mark['mark'] for mark in marks if mark['mark'] != 0]
+    values = [mark["mark"] for mark in marks if mark["mark"] != 0]
     if not values:
         return 0
     return sum(values) / len(values)
@@ -104,29 +103,31 @@ def fix_to5(grades):
 def format_fix_marks(added, mark):
     text = []
     for add in added:
-        text.append(', '.join(str(i) for i in add))
-    text = '\n'.join(text)
-    return f'до <b>{mark}</b>:\n{text}'
+        text.append(", ".join(str(i) for i in add))
+    text = "\n".join(text)
+    return f"до <b>{mark}</b>:\n{text}"
 
 
 def fix_text(marks, mean):
-    marks = [mark['mark'] for mark in marks]
-    title = '\nподсказки по исправлению:'
+    marks = [mark["mark"] for mark in marks]
+    title = "\nподсказки по исправлению:"
     if mean < 2.5:
         added_marks3 = fix_to3(marks)
         added_marks4 = fix_to4(marks)
         added_marks5 = fix_to5(marks)
-        return (f'{title}\n{format_fix_marks(added_marks3, 3)}\n\n'
-                f'{format_fix_marks(added_marks4, 4)}\n\n{format_fix_marks(added_marks5, 5)}')
+        return (
+            f"{title}\n{format_fix_marks(added_marks3, 3)}\n\n"
+            f"{format_fix_marks(added_marks4, 4)}\n\n{format_fix_marks(added_marks5, 5)}"
+        )
     if mean < 3.5:
         added_marks4 = fix_to4(marks)
         added_marks5 = fix_to5(marks)
-        return f'{title}\n{format_fix_marks(added_marks4, 4)}\n\n{format_fix_marks(added_marks5, 5)}'
+        return f"{title}\n{format_fix_marks(added_marks4, 4)}\n\n{format_fix_marks(added_marks5, 5)}"
     elif mean < 4.5:
         added_marks = fix_to5(marks)
-        return f'{title}\n{format_fix_marks(added_marks, 5)}'
+        return f"{title}\n{format_fix_marks(added_marks, 5)}"
     else:
-        return ''
+        return ""
 
 
 async def show_default(grades, manager, filters, value_filters, show_back=True):
@@ -135,19 +136,23 @@ async def show_default(grades, manager, filters, value_filters, show_back=True):
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
         fix_lessons[lesson] = {
-            'fix': fix_text(marks, mean) if mean else '',
-            'mean': mean
+            "fix": fix_text(marks, mean) if mean else "",
+            "mean": mean,
         }
     grades = filter_grades(grades, filters, value_filters)
     for lesson, marks in grades.items():
-        mean = fix_lessons[lesson]['mean']
+        mean = fix_lessons[lesson]["mean"]
         if not marks:
-            text.append({'marks': f'<b>{lesson} нет оценок</b>', 'fix': ''})
+            text.append({"marks": f"<b>{lesson} нет оценок</b>", "fix": ""})
             continue
-        values = ', '.join([str(mark['mark']) for mark in marks])
-        text.append({'marks': f'<b>{lesson}</b> {values}, <b>средняя части года</b> {mean: .2f}',
-                     'fix': fix_lessons[lesson]['fix']})
-    await manager.start(ShowStates.SHOW, {'text': text, 'show_back': show_back})
+        values = ", ".join([str(mark["mark"]) for mark in marks])
+        text.append(
+            {
+                "marks": f"<b>{lesson}</b> {values}, <b>средняя части года</b> {mean: .2f}",
+                "fix": fix_lessons[lesson]["fix"],
+            }
+        )
+    await manager.start(ShowStates.SHOW, {"text": text, "show_back": show_back})
 
 
 def show_detail(grades, filters, value_filters):
@@ -157,28 +162,32 @@ def show_detail(grades, filters, value_filters):
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
         if not mean:
-            lessons[lesson] = f'<b>{lesson} нет оценок</b>', mean
+            lessons[lesson] = f"<b>{lesson} нет оценок</b>", mean
             continue
 
-        text = [f'<i>статистика</i> оценок по <b>{lesson}</b>, <u>средняя</u> {mean: .2f}']
+        text = [
+            f"<i>статистика</i> оценок по <b>{lesson}</b>, <u>средняя</u> {mean: .2f}"
+        ]
         if mean_value != 0:
             if mean >= mean_value:
                 text.append(
-                    f'<b>эта</b> <i>средняя оценка</i> <b>больше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
+                    f"<b>эта</b> <i>средняя оценка</i> <b>больше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})"
+                )
             else:
                 text.append(
-                    f'<b>эта</b> <i>средняя оценка</i> <b>меньше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})')
+                    f"<b>эта</b> <i>средняя оценка</i> <b>меньше</b> <i>средней оценки</i> по всем предметам ({mean_value:.2f})"
+                )
 
         if mean >= 4.5:
-            text.append('в <b>этой части года</b> <u>должна</u> выйти 5')
+            text.append("в <b>этой части года</b> <u>должна</u> выйти 5")
         elif mean >= 3.5:
-            text.append('в <b>этой части года</b> <u>должна</u> выйти 4')
+            text.append("в <b>этой части года</b> <u>должна</u> выйти 4")
         elif mean >= 2.5:
-            text.append('в <b>этой части года</b> <u>должна</u> выйти 3')
+            text.append("в <b>этой части года</b> <u>должна</u> выйти 3")
         elif mean > 0:
-            text.append('в <b>этой части года</b> <u>должна</u> выйти 2')
+            text.append("в <b>этой части года</b> <u>должна</u> выйти 2")
         else:
-            text.append('<u>нет оценок</u>. Нужно получить. А то ничего не выйдет.')
+            text.append("<u>нет оценок</u>. Нужно получить. А то ничего не выйдет.")
         lessons[lesson] = text, mean
 
     grades = filter_grades(grades, filters, value_filters)
@@ -190,35 +199,40 @@ def show_detail(grades, filters, value_filters):
             lessons_text[lesson] = text
             continue
         marks_count = {5: 0, 4: 0, 3: 0, 2: 0}
-        marks_text = ['<u>список выбранных оценок</u>:']
+        marks_text = ["<u>список выбранных оценок</u>:"]
         for mark in marks:
-            value = mark['mark']
-            lesson_date = mark['lesson_date']
-            date = mark['date']
+            value = mark["mark"]
+            lesson_date = mark["lesson_date"]
+            date = mark["date"]
             marks_count[value] += 1
             marks_text.append(
-                f'<b>{value}</b>, <u>дата урока</u> <i>{lesson_date}</i>, <u>дата проставления</u> <i>{date}</i>')
+                f"<b>{value}</b>, <u>дата урока</u> <i>{lesson_date}</i>, <u>дата проставления</u> <i>{date}</i>"
+            )
 
-        marks_count_text = [f'<b>всего оценок</b>: {sum(marks_count.values())}, из них:']
+        marks_count_text = [
+            f"<b>всего оценок</b>: {sum(marks_count.values())}, из них:"
+        ]
         for mark, count in marks_count.items():
-            marks_count_text.append(f'<b>{mark}</b> - <u>{count}</u>')
+            marks_count_text.append(f"<b>{mark}</b> - <u>{count}</u>")
 
-        text += '\n'.join(marks_count_text), '\n'.join(marks_text)
-        lessons_text[lesson] = '\n'.join(('\n\n'.join(text), fix_text(marks, mean)))
+        text += "\n".join(marks_count_text), "\n".join(marks_text)
+        lessons_text[lesson] = "\n".join(("\n\n".join(text), fix_text(marks, mean)))
     return lessons_text
 
 
 def show_summary(grades, marks_selected):
-    text = ['<b>статистика</b> <i>оценок</i> за <u>текущую часть года</u>:']
+    text = ["<b>статистика</b> <i>оценок</i> за <u>текущую часть года</u>:"]
     lessons = {5: [], 4: [], 3: [], 2: [], 0: []}
-    max_mean = ['', 0]
-    min_mean = ['', 6]
+    max_mean = ["", 0]
+    min_mean = ["", 6]
 
     less_mean = []
     greater_mean = []
     mean_value = mean_mark(list(itertools.chain(*grades.values())))
     if mean_value != 0:
-        text.append(f'{mean_value:.2f} - <b>средняя</b> <i>оценка</i> по <b>всем</b> предметам')
+        text.append(
+            f"{mean_value:.2f} - <b>средняя</b> <i>оценка</i> по <b>всем</b> предметам"
+        )
 
     for lesson, marks in grades.items():
         mean = mean_mark(marks)
@@ -245,38 +259,53 @@ def show_summary(grades, marks_selected):
                 less_mean.append(lesson)
 
     if max_mean[1] != 0:
-        text.append(f'{max_mean[1]:.2f} — <b>наибольшая</b> <i>средняя</i> оценка по <u>{max_mean[0]}</u>')
+        text.append(
+            f"{max_mean[1]:.2f} — <b>наибольшая</b> <i>средняя</i> оценка по <u>{max_mean[0]}</u>"
+        )
     if min_mean[1] != 6:
-        text.append(f'{min_mean[1]:.2f} — <b>наименьшая</b> <i>средняя</i> оценка по <u>{min_mean[0]}</u>')
+        text.append(
+            f"{min_mean[1]:.2f} — <b>наименьшая</b> <i>средняя</i> оценка по <u>{min_mean[0]}</u>"
+        )
 
     if greater_mean:
-        greater_mean_lessons = ', '.join(greater_mean)
-        text.append(f'<b>средняя оценка</b> по предметам {greater_mean_lessons} '
-                    f'<b>больше</b> <u>средней оценки</u> по <i>всем</i> предметам')
+        greater_mean_lessons = ", ".join(greater_mean)
+        text.append(
+            f"<b>средняя оценка</b> по предметам {greater_mean_lessons} "
+            f"<b>больше</b> <u>средней оценки</u> по <i>всем</i> предметам"
+        )
 
     if less_mean:
-        less_mean_lessons = ', '.join(less_mean)
-        text.append(f'<b>средняя оценка</b> по предметам {less_mean_lessons} '
-                    f'<b>меньше</b> <u>средней оценки</u> по <i>всем</i> предметам')
+        less_mean_lessons = ", ".join(less_mean)
+        text.append(
+            f"<b>средняя оценка</b> по предметам {less_mean_lessons} "
+            f"<b>меньше</b> <u>средней оценки</u> по <i>всем</i> предметам"
+        )
 
     for mark, lessons in lessons.items():
         if mark not in marks_selected:
             continue
-        lessons = ', '.join(lessons)
+        lessons = ", ".join(lessons)
         if mark == 0:
-            text.append(f'<b>нет оценок</b> по предметам {lessons}')
+            text.append(f"<b>нет оценок</b> по предметам {lessons}")
         elif lessons:
-            text.append(f'<b>{mark}</b> выходит по {lessons}')
-    return '\n\n'.join(text)
+            text.append(f"<b>{mark}</b> выходит по {lessons}")
+    return "\n\n".join(text)
 
 
-async def show_statistics(grades, manager, marks_selected, filters, value_filters, show_back=True):
+async def show_statistics(
+    grades, manager, marks_selected, filters, value_filters, show_back=True
+):
     lessons = show_detail(grades, filters, value_filters)
     if not lessons:
-        await manager.start(ShowStates.SHOW_BIG, {'lessons': lessons, 'show_back': show_back})
+        await manager.start(
+            ShowStates.SHOW_BIG, {"lessons": lessons, "show_back": show_back}
+        )
         return
     summary = show_summary(grades, marks_selected)
-    await manager.start(ShowStates.SHOW_SMALL, {'grades': summary, 'lessons': lessons, 'show_back': show_back})
+    await manager.start(
+        ShowStates.SHOW_SMALL,
+        {"grades": summary, "lessons": lessons, "show_back": show_back},
+    )
 
 
 class TextFromGetter(Text):
@@ -289,138 +318,161 @@ class TextFromGetter(Text):
 
 
 async def on_start(start_data, manager: DialogManager):
-    if isinstance(start_data, dict) and 'lessons' in start_data:
-        lessons = list(start_data['lessons'])
+    if isinstance(start_data, dict) and "lessons" in start_data:
+        lessons = list(start_data["lessons"])
         if not lessons:
-            manager.dialog_data['current_lesson'] = 'нет уроков'
-            manager.dialog_data['current_lesson_index'] = -1
+            manager.dialog_data["current_lesson"] = "нет уроков"
+            manager.dialog_data["current_lesson_index"] = -1
             return
-        manager.dialog_data['current_lesson_index'] = 0
+        manager.dialog_data["current_lesson_index"] = 0
 
 
 async def on_back(query, button, manager: DialogManager):
-    current_lesson_index = manager.dialog_data['current_lesson_index']
+    current_lesson_index = manager.dialog_data["current_lesson_index"]
     if current_lesson_index == -1:
         return
     current_lesson_index -= 1
-    lessons = manager.start_data['lessons']
+    lessons = manager.start_data["lessons"]
     if current_lesson_index < 0:
         await manager.switch_to(ShowStates.SHOW_SMALL)
         return
-    manager.dialog_data['current_lesson'] = list(lessons)[current_lesson_index]
-    manager.dialog_data['current_lesson_index'] = current_lesson_index
+    manager.dialog_data["current_lesson"] = list(lessons)[current_lesson_index]
+    manager.dialog_data["current_lesson_index"] = current_lesson_index
 
 
 async def on_next(query, button, manager: DialogManager):
-    current_lesson_index = manager.dialog_data['current_lesson_index']
+    current_lesson_index = manager.dialog_data["current_lesson_index"]
     if current_lesson_index == -1:
         return
     current_lesson_index += 1
-    lessons = manager.start_data['lessons']
+    lessons = manager.start_data["lessons"]
     if current_lesson_index >= len(lessons):
         await manager.switch_to(ShowStates.SHOW_SMALL)
         return
-    manager.dialog_data['current_lesson'] = list(lessons)[current_lesson_index]
-    manager.dialog_data['current_lesson_index'] = current_lesson_index
+    manager.dialog_data["current_lesson"] = list(lessons)[current_lesson_index]
+    manager.dialog_data["current_lesson_index"] = current_lesson_index
 
 
 async def on_select_current_lesson(event, select, manager: DialogManager, item):
-    if manager.dialog_data['current_lesson_index'] == -1:
+    if manager.dialog_data["current_lesson_index"] == -1:
         await manager.switch_to(ShowStates.SHOW_BIG)
         return
     item = int(item)
-    manager.dialog_data['current_lesson'] = list(manager.start_data['lessons'])[item]
-    manager.dialog_data['current_lesson_index'] = item
+    manager.dialog_data["current_lesson"] = list(manager.start_data["lessons"])[item]
+    manager.dialog_data["current_lesson_index"] = item
     await manager.switch_to(ShowStates.SHOW_BIG)
 
 
 async def on_show_fix(event, checkbox, manager: DialogManager):
-    await manager.update({'show_fix': checkbox.is_checked()})
+    await manager.update({"show_fix": checkbox.is_checked()})
 
 
 def text_getter(data, text, manager: DialogManager):
-    if data['dialog_data']['current_lesson_index'] == -1:
-        return 'нет данных'
-    lessons = data['start_data']['lessons']
-    return lessons[data['dialog_data']['current_lesson']]
+    if data["dialog_data"]["current_lesson_index"] == -1:
+        return "нет данных"
+    lessons = data["start_data"]["lessons"]
+    return lessons[data["dialog_data"]["current_lesson"]]
 
 
 async def on_change_settings(query, button, manager: DialogManager):
-    await manager.done('change_settings')
+    await manager.done("change_settings")
 
 
 async def on_last(event, button, manager: DialogManager):
-    lessons = list(manager.start_data['lessons'])
-    manager.dialog_data['current_lesson'] = lessons[-1]
-    manager.dialog_data['current_lesson_index'] = len(lessons) - 1
+    lessons = list(manager.start_data["lessons"])
+    manager.dialog_data["current_lesson"] = lessons[-1]
+    manager.dialog_data["current_lesson_index"] = len(lessons) - 1
     await manager.switch_to(ShowStates.SHOW_BIG)
 
 
 async def on_begin(event, button, manager: DialogManager):
-    lessons = list(manager.start_data['lessons'])
-    manager.dialog_data['current_lesson'] = lessons[0]
-    manager.dialog_data['current_lesson_index'] = 0
+    lessons = list(manager.start_data["lessons"])
+    manager.dialog_data["current_lesson"] = lessons[0]
+    manager.dialog_data["current_lesson_index"] = 0
     await manager.switch_to(ShowStates.SHOW_BIG)
 
 
 dialog = Dialog(
     Window(
-        Format('{start_data[grades]}'),
+        Format("{start_data[grades]}"),
         Row(
-            Button(Const('<<'), 'back', on_last),
-            SwitchTo(Const('общая'), 'switch', ShowStates.SELECT_CURRENT_LESSON),
-            Button(Const('>>'), 'next', on_begin),
+            Button(Const("<<"), "back", on_last),
+            SwitchTo(Const("общая"), "switch", ShowStates.SELECT_CURRENT_LESSON),
+            Button(Const(">>"), "next", on_begin),
         ),
-        Button(Const('изменить настройки'), 'change_settings_small',
-               on_change_settings, when=F['start_data']['show_back']),
-        state=ShowStates.SHOW_SMALL
+        Button(
+            Const("изменить настройки"),
+            "change_settings_small",
+            on_change_settings,
+            when=F["start_data"]["show_back"],
+        ),
+        state=ShowStates.SHOW_SMALL,
     ),
     Window(
-        Const('показываю оценки'),
+        Const("показываю оценки"),
         List(
-            Case({
-                True: Format('{item[marks]}{item[fix]}\n'),
-                False: Format('{item[marks]}'),
-            }, F['data']['dialog_data'].get('show_fix', False)),
-            F['start_data']['text']
+            Case(
+                {
+                    True: Format("{item[marks]}{item[fix]}\n"),
+                    False: Format("{item[marks]}"),
+                },
+                F["data"]["dialog_data"].get("show_fix", False),
+            ),
+            F["start_data"]["text"],
         ),
         Checkbox(
-            Const('✓ подсказки по исправлению'),
-            Const('подсказки по исправлению'),
-            'show_fix',
-            on_state_changed=on_show_fix
+            Const("✓ подсказки по исправлению"),
+            Const("подсказки по исправлению"),
+            "show_fix",
+            on_state_changed=on_show_fix,
         ),
-        Button(Const('изменить настройки'), 'change_settings',
-               on_change_settings, when=F['start_data']['show_back']),
-        state=ShowStates.SHOW
+        Button(
+            Const("изменить настройки"),
+            "change_settings",
+            on_change_settings,
+            when=F["start_data"]["show_back"],
+        ),
+        state=ShowStates.SHOW,
     ),
     Window(
         TextFromGetter(text_getter),
         Row(
-            Button(Const('<<'), 'back', on_back),
-            SwitchTo(Format('{dialog_data[current_lesson]}'), 'switch', ShowStates.SELECT_CURRENT_LESSON),
-            Button(Const('>>'), 'next', on_next),
+            Button(Const("<<"), "back", on_back),
+            SwitchTo(
+                Format("{dialog_data[current_lesson]}"),
+                "switch",
+                ShowStates.SELECT_CURRENT_LESSON,
+            ),
+            Button(Const(">>"), "next", on_next),
         ),
-        Button(Const('изменить настройки'), 'change_settings_big',
-               on_change_settings, when=F['start_data']['show_back']),
-        state=ShowStates.SHOW_BIG
+        Button(
+            Const("изменить настройки"),
+            "change_settings_big",
+            on_change_settings,
+            when=F["start_data"]["show_back"],
+        ),
+        state=ShowStates.SHOW_BIG,
     ),
     Window(
-        Const('выбери урок'),
-        SwitchTo(Const('общая'), 'switch_to_summary', ShowStates.SHOW_SMALL),
+        Const("выбери урок"),
+        SwitchTo(Const("общая"), "switch_to_summary", ShowStates.SHOW_SMALL),
         Group(
             Radio(
-                Format('✓ {item[1]}'),
-                Format('{item[1]}'),
-                'select',
+                Format("✓ {item[1]}"),
+                Format("{item[1]}"),
+                "select",
                 lambda item: item[0],
                 lambda data: list(
-                    (i, lesson) for i, lesson in enumerate(data['start_data']['lessons'] or ['нет уроков'])),
-                on_click=on_select_current_lesson
+                    (i, lesson)
+                    for i, lesson in enumerate(
+                        data["start_data"]["lessons"] or ["нет уроков"]
+                    )
+                ),
+                on_click=on_select_current_lesson,
             ),
-            width=2
+            width=2,
         ),
-        state=ShowStates.SELECT_CURRENT_LESSON
+        state=ShowStates.SELECT_CURRENT_LESSON,
     ),
-    on_start=on_start
+    on_start=on_start,
 )

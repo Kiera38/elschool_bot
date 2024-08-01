@@ -7,13 +7,13 @@ def create(state, *widgets):
 
 
 def create_status_widget():
-    return Format('{dialog_data[status]}')
+    return Format("{dialog_data[status]}")
 
 
 def set(manager: DialogManager, status: str, **data):
-    manager.dialog_data['status'] = status
+    manager.dialog_data["status"] = status
     manager.dialog_data.update(data)
 
 
 async def update(manager: DialogManager, status: str, show_mode=None, **data):
-    await manager.update({'status': status, **data}, show_mode=show_mode)
+    await manager.update({"status": status, **data}, show_mode=show_mode)

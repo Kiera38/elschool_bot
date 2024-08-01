@@ -24,4 +24,5 @@ class Config:
 def main():
     import elschool_bot.__main__
     import asyncio
+
     asyncio.run(elschool_bot.__main__.main())
