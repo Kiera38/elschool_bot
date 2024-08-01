@@ -72,9 +72,14 @@ async def on_privacy_policy(query, button, manager: DialogManager):
 
 
 async def on_version(query, button, manager: DialogManager):
-    await status.update(manager, '''моя версия: 3.3.0b1.dev15
+    await status.update(manager, '''моя версия: 3.3.1.dev15
 
 Список изменений:
+в 3.3.1:
+Исправление ошибок:
+Изменения в расписании сохраняются
+Автоматические отправки работают
+
 в 3.3.0:
 Не забудьте обновить основное меню!
 просмотр расписания, просмотр расписания звонков, кривой код. Можно указывать изменения в расписании (считается эксперементальной функцией).

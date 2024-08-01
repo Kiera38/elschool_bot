@@ -1,11 +1,10 @@
-import os
 import textwrap
 
 from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.kbd import SwitchTo
-from aiogram_dialog.widgets.text import Const
 from aiogram_dialog.widgets.media import StaticMedia
+from aiogram_dialog.widgets.text import Const
 
 
 class HelpStates(StatesGroup):
