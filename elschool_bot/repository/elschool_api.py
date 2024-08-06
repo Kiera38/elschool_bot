@@ -3,7 +3,7 @@ import logging
 import aiohttp
 from bs4 import BeautifulSoup
 
-from elschool_bot.repository.base import DataProcessError, RegisterError
+from elschool_bot.repository.base_api import DataProcessError, RegisterError
 
 logger = logging.getLogger(__name__)
 
