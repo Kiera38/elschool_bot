@@ -9,7 +9,7 @@ from aiogram.types import TelegramObject
 
 from elschool_bot.repository import elschool_api
 from elschool_bot.repository.base_api import Api
-from elschool_bot.repository.diaries import DiariesRepo
+from elschool_bot.repository.diaries import DiariesRepo, DiariesCacheRepo, DiariesChangesRepo
 from elschool_bot.repository.grades import GradesRepo, Mark
 from elschool_bot.repository.notifications import NotificationsRepo, Notification
 from elschool_bot.repository.users import UserRepo, UserData, ApiData
@@ -42,8 +42,7 @@ class Repo:
         return data.login, data.password
 
     async def check_register_user(self, login, password):
-        elschool = elschool_api
-        return await elschool.register(login, password)
+        return await self.api.register(login, password)
 
     async def register_user(
         self, user_id, jwtoken, url, quarter, login=None, password=None
@@ -263,5 +262,12 @@ class RepoMiddleware(BaseMiddleware):
         data: typing.Dict[str, typing.Any],
     ) -> typing.Any:
         async with aiosqlite.connect(self.dbfile) as connection:
-            data["repo"] = Repo(connection)
+            api = elschool_api
+            user = UserRepo(connection, data['event_from_user'].id)
+            grades = GradesRepo(connection)
+            notifications = NotificationsRepo(connection)
+            diaries_cache = DiariesCacheRepo(connection)
+            diaries_changes = DiariesChangesRepo(connection)
+            diaries = DiariesRepo(diaries_cache, diaries_changes, api, user)
+            data["repo"] = Repo(user, grades, notifications, diaries, api)
             return await handler(event, data)
